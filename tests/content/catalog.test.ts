@@ -12,7 +12,7 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
       { id: "hotel-check-in", english: "I have a reservation.", chinese: "我有预订。", intent: "check-in", keywords: ["reservation"], requiredKeywordGroups: [["reservation"]], recovery: true },
       { id: "hotel-name", english: "My name is Li.", chinese: "我叫李。", intent: "identify", keywords: ["name"], requiredKeywordGroups: [["name"]] },
       { id: "hotel-room", english: "I need a room.", chinese: "我需要一个房间。", intent: "request-room", keywords: ["room"], requiredKeywordGroups: [["room"]] },
-      { id: "hotel-key", english: "Could I have my key?", chinese: "我可以拿房卡吗？", intent: "request-key", keywords: ["key"], requiredKeywordGroups: [["key"]] },
+      { id: "hotel-key", english: "Could I have my key?", chinese: "我可以拿房卡吗？", intent: "request-key", keywords: ["key"], requiredKeywordGroups: [["key", "keys"]] },
       { id: "hotel-thanks", english: "Thank you.", chinese: "谢谢。", intent: "thanks", keywords: ["thank"], requiredKeywordGroups: [["thank"]] }
     ],
     recognitionWords: ["reservation"],
@@ -91,5 +91,13 @@ describe("course catalog", () => {
     expect(() => validateCatalog([candidateMission({ exercises: candidateMission().exercises.map((exercise, index) => index === 0 ? { ...exercise, phraseId: "missing-phrase" } : exercise) })])).toThrow(
       "exercise hotel-intent references missing phraseId: missing-phrase"
     );
+  });
+
+  it("rejects a role-play whose rendered prompt does not satisfy its linked phrase", () => {
+    expect(() => validateCatalog([candidateMission({
+      exercises: candidateMission().exercises.map((exercise) => exercise.type === "roleplay"
+        ? { ...exercise, promptTemplate: "I need {keys} passports." }
+        : exercise)
+    })])).toThrow("roleplay hotel-roleplay does not satisfy linked phrase hotel-key");
   });
 });

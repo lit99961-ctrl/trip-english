@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { missionSchema, type Mission } from "../domain/content-schema";
+import { scoreTranscript } from "../domain/functional-score";
 import { deepFreeze, renderRoleplayPrompt, type DeepReadonly } from "./content-validation";
 import { businessMissions } from "./missions.business";
 import { travelMissions } from "./missions.travel";
@@ -34,13 +35,20 @@ export function validateCatalog(candidate: unknown = missionSource): DeepReadonl
   );
 
   for (const mission of missions) {
-    const phraseIds = new Set(mission.productionPhrases.map((phrase) => phrase.id));
+    const phrasesById = new Map(mission.productionPhrases.map((phrase) => [phrase.id, phrase]));
 
     for (const exercise of mission.exercises) {
-      if (exercise.phraseId !== undefined && !phraseIds.has(exercise.phraseId)) {
+      if (exercise.phraseId !== undefined && !phrasesById.has(exercise.phraseId)) {
         throw new Error(
           `exercise ${exercise.id} references missing phraseId: ${exercise.phraseId}`
         );
+      }
+      if (exercise.type === "roleplay") {
+        const phrase = phrasesById.get(exercise.phraseId)!;
+        const renderedPrompt = renderRoleplayPrompt(exercise.promptTemplate, exercise.variation);
+        if (!scoreTranscript(renderedPrompt, { requiredKeywords: phrase.requiredKeywordGroups }).passed) {
+          throw new Error(`roleplay ${exercise.id} does not satisfy linked phrase ${phrase.id}`);
+        }
       }
     }
   }

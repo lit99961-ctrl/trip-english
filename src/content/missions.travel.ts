@@ -96,10 +96,10 @@ const travelMissionSource: readonly Mission[] = [
     ["bill", "Could I have the bill, please?", "请给我账单，好吗？", "request-bill", ["bill", "please"], [["bill", "check"]]],
     ["point-menu", "Could you point to it on the menu?", "您能在菜单上指给我看吗？", "recover-menu", ["point", "menu"], [["point", "show"], ["menu"]], true]
   ]),
-  travelMission("italy-high-speed-rail", "意大利高铁", "Rome–Florence–Venice", ["platform", "carriage", "seat", "delay", "departure"], { platform: "9", carriage: "4" }, "Is this train on platform {platform}? Where is carriage {carriage}?", "DEPARTURES: FLORENCE / VENICE — PLATFORM 9", "platform", ["train", "platform"], [
+  travelMission("italy-high-speed-rail", "意大利高铁", "Rome–Florence–Venice", ["platform", "carriage", "seat", "delay", "departure"], { platform: "9", carriage: "4" }, "Is this train on platform {platform}? Where is carriage {carriage}?", "DEPARTURES: FLORENCE / VENICE — PLATFORM 9", "car", ["train", "platform"], [
     ["train", "Is this the train to Florence?", "这是去佛罗伦萨的火车吗？", "confirm-train", ["train", "Florence"], [["train"], ["Florence"]]],
-    ["platform", "Which platform is it?", "是哪个站台？", "find-platform", ["platform", "track"], [["where", "which", "is this"], ["platform", "track"]]],
-    ["car", "Where is carriage four?", "4号车厢在哪里？", "find-carriage", ["carriage", "four"], [["carriage"], ["four", "4"]]],
+    ["platform", "Which platform is it?", "是哪个站台？", "find-platform", ["platform", "track"], [["which", "what"], ["platform", "track"]]],
+    ["car", "Where is carriage four?", "4号车厢在哪里？", "find-carriage", ["carriage", "four"], [["where"], ["carriage"], ["four", "4"]]],
     ["seat", "Is this seat 12A?", "这是12A座位吗？", "confirm-seat", ["seat", "12A"], [["seat"], ["12A"]]],
     ["delay", "Is the train delayed?", "火车晚点了吗？", "ask-delay", ["delayed", "train"], [["train"], ["delayed", "delay", "late"]]],
     ["help", "Could you help me find my seat?", "您能帮我找座位吗？", "recover-seat", ["help", "seat"], [["find"], ["seat"]], true]
@@ -114,7 +114,7 @@ const travelMissionSource: readonly Mission[] = [
   ]),
   travelMission("milan-swiss-transfer", "米兰转乘瑞士火车", "Milan–Interlaken", ["change", "platform", "border", "delay", "Interlaken"], { destination: "Interlaken", platform: "6" }, "Is this for {destination}? Which platform is {platform}?", "INTERLAKEN — CHANGE TRAINS — PLATFORM 6", "platform", ["interlaken", "change"], [
     ["interlaken", "Is this train for Interlaken?", "这趟车去因特拉肯吗？", "confirm-destination", ["train", "Interlaken"], [["train"], ["Interlaken"]]],
-    ["change", "Where do I change trains?", "我在哪里换车？", "ask-change", ["change", "trains"], [["where"], ["change trains", "change"]]],
+    ["change", "Where do I change trains?", "我在哪里换车？", "ask-change", ["change", "trains"], [["where"], ["change trains", "transfer trains"]]],
     ["platform", "Which platform does the next train leave from?", "下一趟火车从哪个站台出发？", "find-next-platform", ["platform", "leave from"], [["platform"]]],
     ["border", "Do we stop at the border?", "我们会在边境停吗？", "ask-border", ["border", "stop"], [["border"], ["stop"]]],
     ["delay", "Will I miss my connection?", "我会错过接驳车吗？", "ask-connection-risk", ["miss", "connection"], [["miss"], ["connection"]]],

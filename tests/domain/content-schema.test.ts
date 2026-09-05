@@ -99,7 +99,7 @@ describe("missionSchema", () => {
     }).success).toBe(false);
     expect(missionSchema.safeParse({
       ...missionBase,
-      exercises: Array.from({ length: 5 }, (_, index) => ({ ...exerciseBase, id: `roleplay-${index}`, type: "roleplay" }))
+      exercises: Array.from({ length: 5 }, (_, index) => ({ ...exerciseBase, id: `roleplay-${index}`, type: "roleplay", phraseId: "exercise-phrase-0" }))
     }).success).toBe(false);
   });
 
@@ -115,7 +115,36 @@ describe("missionSchema", () => {
       })), recognitionWords: ["notice"]
     };
     expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE", variation: { item: "x" } })) }).success).toBe(false);
-    expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-role-${index}`, type: "roleplay", promptZh: "对话", variation: {}, promptTemplate: "Hello" })) }).success).toBe(false);
-    expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-role-${index}`, type: "roleplay", promptZh: "对话", variation: { item: "x" }, promptTemplate: "Hello" })) }).success).toBe(false);
+    expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-role-${index}`, type: "roleplay", phraseId: "strict-0", promptZh: "对话", variation: {}, promptTemplate: "Hello" })) }).success).toBe(false);
+    expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-role-${index}`, type: "roleplay", phraseId: "strict-0", promptZh: "对话", variation: { item: "x" }, promptTemplate: "Hello" })) }).success).toBe(false);
+  });
+
+  it("requires role-play phrase links and rejects unknown nested fields", () => {
+    const phrase = {
+      id: "strict-phrase", english: "Please help.", chinese: "请帮忙。", intent: "help",
+      keywords: ["help"], requiredKeywordGroups: [["help"]], recovery: true
+    };
+    const phrases = Array.from({ length: 5 }, (_, index) => ({ ...phrase, id: `${phrase.id}-${index}` }));
+    const roleplay = { id: "strict-roleplay", type: "roleplay", phraseId: "", promptZh: "对话", variation: { item: "help" }, promptTemplate: "Please {item}." };
+    const travel = {
+      id: "strict-mission", kind: "travel", titleZh: "严格", city: "Rome",
+      productionPhrases: phrases, recognitionWords: ["help"],
+      exercises: Array.from({ length: 5 }, (_, index) => ({ ...roleplay, id: `${roleplay.id}-${index}` }))
+    };
+
+    expect(missionSchema.safeParse(travel).success).toBe(false);
+    expect(phraseSchema.safeParse(phrase).success).toBe(true);
+    expect(phraseSchema.safeParse({ ...phrase, misspelledField: true }).success).toBe(false);
+    const business = {
+      id: "strict-business", kind: "business", titleZh: "严格", city: "Reading", embeddedSession: 8,
+      productionPhrases: phrases, recognitionWords: ["help"],
+      exercises: [{ id: "strict-reading", type: "reading", promptZh: "阅读", readingText: "HELP", questions: [{ promptZh: "什么？", expectedAnswers: ["HELP"] }] }]
+    };
+    expect(missionSchema.safeParse(business).success).toBe(true);
+    expect(missionSchema.safeParse({ ...business, unknownMissionField: true }).success).toBe(false);
+    expect(missionSchema.safeParse({
+      ...business,
+      exercises: [{ ...business.exercises[0], questions: [{ ...business.exercises[0]!.questions[0], unknownQuestionField: true }] }]
+    }).success).toBe(false);
   });
 });

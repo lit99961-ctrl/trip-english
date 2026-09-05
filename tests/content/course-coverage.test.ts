@@ -59,6 +59,7 @@ describe("itinerary course coverage", () => {
     expect(passesPhrase("restaurant-table", "table two")).toBe(true);
     expect(passesPhrase("restaurant-bill", "bill")).toBe(true);
     expect(passesPhrase("rome-arrival-baggage", "find baggage claim")).toBe(true);
+    expect(passesPhrase("milan-swiss-transfer-change", "where change trains")).toBe(true);
   });
 
   it("binds every role-play variation to its prompt template", () => {
@@ -138,10 +139,12 @@ describe("itinerary course coverage", () => {
   it("rejects representative bare travel objects", () => {
     expect(passesPhrase("hk-checkin-gate", "gate")).toBe(false);
     expect(passesPhrase("helsinki-transfer-gate", "gate")).toBe(false);
+    expect(passesPhrase("italy-high-speed-rail-platform", "is this platform")).toBe(false);
     expect(passesPhrase("italy-high-speed-rail-platform", "is platform")).toBe(false);
     expect(passesPhrase("italy-high-speed-rail-platform", "platform")).toBe(false);
     expect(passesPhrase("shopping-tax-refund-size", "have medium")).toBe(false);
     expect(passesPhrase("shopping-tax-refund-size", "medium")).toBe(false);
+    expect(passesPhrase("milan-swiss-transfer-change", "where change")).toBe(false);
   });
 
   it("keeps the explicit twenty-eight travel target suffixes", () => {
@@ -304,6 +307,7 @@ describe("itinerary course coverage", () => {
 
     expect(roleplayFor("swiss-mountain-transit").phraseId).toBe("swiss-mountain-transit-return");
     expect(roleplayFor("urgent-help").phraseId).toBe("urgent-help-police");
+    expect(roleplayFor("italy-high-speed-rail").phraseId).toBe("italy-high-speed-rail-car");
     expect(renderRoleplayPrompt(roleplayFor("urgent-help").promptTemplate, roleplayFor("urgent-help").variation))
       .toContain("at the station entrance");
   });
