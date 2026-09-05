@@ -38,7 +38,9 @@ const phraseReviewSchema = z.object({
   dueAt: isoDateTime,
   successfulAttempts: z.number().int().nonnegative(),
   hintCount: z.number().int().nonnegative(),
-  masteredAt: isoDateTime.optional()
+  masteredAt: isoDateTime.optional(),
+  lastAttemptOccurredAt: isoDateTime.optional(),
+  lastScheduleEventId: z.string().min(1).optional()
 }).strict();
 
 export const learnerProgressV1Schema = z.object({

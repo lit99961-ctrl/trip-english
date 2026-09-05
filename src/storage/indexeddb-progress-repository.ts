@@ -115,6 +115,15 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     const storedEventPayload = input.eventId
       ? session.exerciseEvents?.[input.eventId]
       : undefined;
+    const eventInOtherSession = input.eventId
+      ? Object.entries(progress.sessions).find(([storedMissionId, storedSession]) =>
+        storedMissionId !== input.missionId
+        && storedSession.exerciseEvents?.[input.eventId!] !== undefined
+      )
+      : undefined;
+    if (eventInOtherSession) {
+      throw new Error(`exercise event id collision across missions: ${input.eventId}`);
+    }
     if (storedEventPayload !== undefined) {
       if (storedEventPayload !== normalizedEventPayload) {
         throw new Error(`exercise event id collision: ${input.eventId}`);
@@ -148,7 +157,13 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       : derivePhraseClasses(phraseAttempts);
     const reviewUpdate = input.attemptEvent === undefined
       ? undefined
-      : reviewForAttempt(input.attemptEvent, input.missionId, phraseAttempts ?? {}, phraseClasses ?? {});
+      : reviewForAttempt(
+        input.attemptEvent,
+        input.eventId!,
+        input.missionId,
+        phraseAttempts ?? {},
+        progress
+      );
     const previousReview = reviewUpdate
       ? progress.phraseReviews[reviewUpdate.phraseId]
       : undefined;
@@ -161,8 +176,10 @@ export class IndexedDbProgressRepository implements ProgressRepository {
           successfulAttempts: (previousReview?.successfulAttempts ?? 0) + reviewUpdate.successfulAttemptDelta,
           hintCount: (previousReview?.hintCount ?? 0) + reviewUpdate.hintCountDelta,
           ...((previousReview?.masteredAt ?? reviewUpdate.masteredAt) === undefined ? {} : {
-            masteredAt: previousReview?.masteredAt ?? reviewUpdate.masteredAt
-          })
+            masteredAt: earliestTimestamp(previousReview?.masteredAt, reviewUpdate.masteredAt)
+          }),
+          lastAttemptOccurredAt: reviewUpdate.lastAttemptOccurredAt,
+          lastScheduleEventId: reviewUpdate.lastScheduleEventId
         }
       };
     const promptFreeScenarioIds = reviewUpdate?.scenarioId === undefined
@@ -358,9 +375,10 @@ function attemptEventWasProcessed(progress: LearnerProgressV1, attemptId: string
 
 function reviewForAttempt(
   event: LearningAttemptEvent,
+  eventId: string,
   missionId: string,
   attemptsByPhrase: Record<string, Attempt[]>,
-  classes: Record<string, AttemptClass>
+  progress: LearnerProgressV1
 ): {
   phraseId: string;
   dueAt: string;
@@ -368,6 +386,8 @@ function reviewForAttempt(
   hintCountDelta: number;
   masteredAt?: string;
   scenarioId?: string;
+  lastAttemptOccurredAt: string;
+  lastScheduleEventId: string;
 } {
   if (event.missionId !== missionId) throw new Error("attempt event mission does not match exercise event");
   const occurredAt = new Date(event.occurredAt);
@@ -380,28 +400,105 @@ function reviewForAttempt(
   const hintCount = attempt.hintCount ?? 0;
   if (event.hintUsed !== (hintCount > 0)) throw new Error("attempt event hint usage does not match attempt");
 
-  const productionPass = attempt.passed && attempt.activity !== "choice";
-  const promptFreePass = productionPass
-    && attempt.supportLevel === "prompt-only"
-    && !attempt.answerRevealed;
-  const mastered = classes[event.phraseId] === "mastered";
-  const outcome: ReviewOutcome = !attempt.passed
-    ? "failed"
-    : mastered ? "mastered" : promptFreePass ? "prompt-free" : "supported";
+  const records = learningEventsForPhrase(progress, event.phraseId);
+  records.push({ eventId, event, attempt });
+  records.sort(compareLearningEvents);
+  const firstMasteryIndex = records.findIndex((_, index) =>
+    canMaster(records.slice(0, index + 1).map((record) => record.attempt))
+  );
+  const latest = records.at(-1)!;
+  const latestIndex = records.length - 1;
+  const outcome = reviewOutcome(latest.attempt, latestIndex === firstMasteryIndex);
   const schedule = scheduleReview({
     outcome,
-    confidence: !attempt.passed ? 1 : promptFreePass || mastered ? 3 : 2,
-    hintCount,
-    now: occurredAt
+    confidence: !latest.attempt.passed
+      ? 1
+      : isPromptFreePass(latest.attempt) || latestIndex === firstMasteryIndex ? 3 : 2,
+    hintCount: latest.attempt.hintCount ?? 0,
+    now: new Date(latest.event.occurredAt)
   });
+  const productionPass = attempt.passed && attempt.activity !== "choice";
+  const promptFreePass = isPromptFreePass(attempt);
   return {
     phraseId: event.phraseId,
     dueAt: schedule.dueAt,
     successfulAttemptDelta: productionPass ? 1 : 0,
     hintCountDelta: hintCount,
-    ...(mastered ? { masteredAt: event.occurredAt } : {}),
-    ...(promptFreePass && event.scenarioId ? { scenarioId: event.scenarioId } : {})
+    ...(firstMasteryIndex < 0 ? {} : { masteredAt: records[firstMasteryIndex]!.event.occurredAt }),
+    ...(promptFreePass && event.scenarioId ? { scenarioId: event.scenarioId } : {}),
+    lastAttemptOccurredAt: latest.event.occurredAt,
+    lastScheduleEventId: latest.eventId
   };
+}
+
+interface LearningEventRecord {
+  eventId: string;
+  event: LearningAttemptEvent;
+  attempt: Attempt;
+}
+
+function learningEventsForPhrase(
+  progress: LearnerProgressV1,
+  phraseId: string
+): LearningEventRecord[] {
+  const records: LearningEventRecord[] = [];
+  for (const session of Object.values(progress.sessions)) {
+    for (const [eventId, payload] of Object.entries(session.exerciseEvents ?? {})) {
+      try {
+        const parsed = JSON.parse(payload) as {
+          attemptEvent?: LearningAttemptEvent;
+          phraseAttempts?: Record<string, Attempt[]>;
+        };
+        const event = parsed.attemptEvent;
+        if (!event || event.phraseId !== phraseId) continue;
+        const attempt = parsed.phraseAttempts?.[phraseId]
+          ?.find((item) => item.attemptId === event.attemptId);
+        const occurredAt = new Date(event.occurredAt);
+        if (
+          attempt
+          && !Number.isNaN(occurredAt.getTime())
+          && occurredAt.toISOString() === event.occurredAt
+          && attempt.timestamp === event.occurredAt
+          && event.hintUsed === ((attempt.hintCount ?? 0) > 0)
+        ) {
+          records.push({ eventId, event, attempt });
+        }
+      } catch {
+        // Older event payloads may not contain structured attempt metadata.
+      }
+    }
+  }
+  return records;
+}
+
+function compareLearningEvents(left: LearningEventRecord, right: LearningEventRecord): number {
+  if (left.event.occurredAt < right.event.occurredAt) return -1;
+  if (left.event.occurredAt > right.event.occurredAt) return 1;
+  if (left.eventId < right.eventId) return -1;
+  if (left.eventId > right.eventId) return 1;
+  return 0;
+}
+
+function isPromptFreePass(attempt: Attempt): boolean {
+  return attempt.passed
+    && attempt.activity !== "choice"
+    && attempt.supportLevel === "prompt-only"
+    && !attempt.answerRevealed;
+}
+
+function reviewOutcome(attempt: Attempt, firstMastery: boolean): ReviewOutcome {
+  if (!attempt.passed) return "failed";
+  if (firstMastery) return "mastered";
+  return isPromptFreePass(attempt) ? "prompt-free" : "supported";
+}
+
+function earliestTimestamp(
+  left: string | undefined,
+  right: string | undefined
+): string | undefined {
+  if (left === undefined) return right;
+  if (right === undefined) return left;
+  return left < right ? left : right;
 }
 
 function progressesEqual(storedProgress: unknown, expectedProgress: LearnerProgressV1): boolean {

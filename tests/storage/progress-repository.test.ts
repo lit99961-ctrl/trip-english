@@ -695,6 +695,139 @@ describe("IndexedDbProgressRepository", () => {
     expect(stored.promptFreeScenarioIds).toEqual(["hotel-help"]);
   });
 
+  test("schedules a supported attempt normally after mastery without moving masteredAt", async () => {
+    const repository = createRepository();
+    const times = [
+      "2026-09-01T10:00:00.000Z",
+      "2026-09-02T10:00:00.000Z",
+      "2026-09-03T10:00:00.000Z",
+      "2026-09-04T10:00:00.000Z"
+    ];
+    const attempts = times.map((timestamp, index) => ({
+      attemptId: `mastered-history-${index}`,
+      supportLevel: (index === 1 ? "prompt-only" : "english") as "prompt-only" | "english",
+      passed: true,
+      answerRevealed: false,
+      hintCount: index === 3 ? 1 : 0,
+      timestamp,
+      activity: "production" as const
+    }));
+    for (let index = 0; index < attempts.length; index += 1) {
+      const attempt = attempts[index]!;
+      await repository.saveExerciseResult({
+        missionId: "hotel", exerciseId: `e${index + 1}`, eventId: `master-event-${index}`,
+        speakingSecondsDelta: 0,
+        attemptEvent: {
+          attemptId: attempt.attemptId, phraseId: "reservation", missionId: "hotel",
+          ...(index === 1 ? { scenarioId: "hotel-roleplay" } : {}),
+          hintUsed: (attempt.hintCount ?? 0) > 0, occurredAt: attempt.timestamp
+        },
+        lessonState: {
+          completedExerciseIds: attempts.slice(0, index + 1).map((_, itemIndex) => `e${itemIndex + 1}`),
+          phraseAttempts: { reservation: attempts.slice(0, index + 1) },
+          phraseClasses: { reservation: index >= 2 ? "mastered" : "practiced" }
+        }
+      });
+    }
+
+    const review = (await repository.load()).phraseReviews.reservation!;
+    expect(review.masteredAt).toBe(times[2]);
+    expect(review.dueAt).toBe("2026-09-05T10:00:00.000Z");
+    expect(review).toMatchObject({
+      lastAttemptOccurredAt: times[3],
+      lastScheduleEventId: "master-event-3"
+    });
+  });
+
+  test("produces the same mastery schedule when older attempt events arrive late", async () => {
+    const chronological = createRepository();
+    const outOfOrder = createRepository();
+    const outOfOrderSecondView = new IndexedDbProgressRepository(databaseNames.at(-1)!);
+    repositories.push(outOfOrderSecondView);
+    const events = [
+      { missionId: "early", eventId: "event-a", occurredAt: "2026-09-01T10:00:00.000Z", supportLevel: "english" as const, hintCount: 1 },
+      { missionId: "middle", eventId: "event-b", occurredAt: "2026-09-02T10:00:00.000Z", supportLevel: "prompt-only" as const, hintCount: 0 },
+      { missionId: "latest", eventId: "event-c", occurredAt: "2026-09-03T10:00:00.000Z", supportLevel: "english" as const, hintCount: 0 }
+    ];
+    const save = async (repository: IndexedDbProgressRepository, index: number) => {
+      const item = events[index]!;
+      const attemptId = `ordered-attempt-${index}`;
+      await repository.saveExerciseResult({
+        missionId: item.missionId, exerciseId: "e1", eventId: item.eventId,
+        speakingSecondsDelta: 0,
+        attemptEvent: {
+          attemptId, phraseId: "help", missionId: item.missionId,
+          ...(item.supportLevel === "prompt-only" ? { scenarioId: "help-scenario" } : {}),
+          hintUsed: item.hintCount > 0, occurredAt: item.occurredAt
+        },
+        lessonState: {
+          completedExerciseIds: ["e1"],
+          phraseAttempts: { help: [{
+            attemptId, supportLevel: item.supportLevel, passed: true,
+            answerRevealed: false, hintCount: item.hintCount, timestamp: item.occurredAt,
+            activity: "production"
+          }] },
+          phraseClasses: { help: item.supportLevel === "prompt-only" ? "recalled" : "practiced" }
+        }
+      });
+    };
+    for (const index of [0, 1, 2]) await save(chronological, index);
+    await save(outOfOrder, 2);
+    await save(outOfOrderSecondView, 1);
+    await save(outOfOrder, 0);
+
+    expect((await outOfOrder.load()).phraseReviews.help).toEqual(
+      (await chronological.load()).phraseReviews.help
+    );
+    expect((await outOfOrder.load()).phraseReviews.help).toMatchObject({
+      dueAt: "2026-09-10T10:00:00.000Z",
+      masteredAt: "2026-09-03T10:00:00.000Z",
+      successfulAttempts: 3,
+      hintCount: 1,
+      lastAttemptOccurredAt: "2026-09-03T10:00:00.000Z",
+      lastScheduleEventId: "event-c"
+    });
+    expect((await outOfOrder.load()).hintCount).toBe(1);
+  });
+
+  test("uses event id as a deterministic schedule tie-breaker", async () => {
+    const firstOrder = createRepository();
+    const reverseOrder = createRepository();
+    const occurredAt = "2026-09-05T10:00:00.000Z";
+    const save = async (
+      repository: IndexedDbProgressRepository,
+      eventId: string,
+      passed: boolean
+    ) => {
+      const missionId = `mission-${eventId}`;
+      const attemptId = `attempt-${eventId}`;
+      await repository.saveExerciseResult({
+        missionId, exerciseId: "e1", eventId, speakingSecondsDelta: 0,
+        attemptEvent: { attemptId, phraseId: "help", missionId, hintUsed: false, occurredAt },
+        lessonState: {
+          completedExerciseIds: ["e1"],
+          phraseAttempts: { help: [{
+            attemptId, supportLevel: "prompt-only", passed, answerRevealed: false,
+            hintCount: 0, timestamp: occurredAt, activity: "production"
+          }] },
+          phraseClasses: { help: passed ? "recalled" : "introduced" }
+        }
+      });
+    };
+    await save(firstOrder, "event-a", true);
+    await save(firstOrder, "event-z", false);
+    await save(reverseOrder, "event-z", false);
+    await save(reverseOrder, "event-a", true);
+
+    expect((await reverseOrder.load()).phraseReviews.help).toEqual(
+      (await firstOrder.load()).phraseReviews.help
+    );
+    expect((await reverseOrder.load()).phraseReviews.help).toMatchObject({
+      dueAt: "2026-09-05T10:10:00.000Z",
+      lastScheduleEventId: "event-z"
+    });
+  });
+
   test("reset clears progress and recordings while leaving the repository usable", async () => {
     const repository = createRepository();
     await repository.saveExerciseResult({ missionId: "hotel", exerciseId: "listen-1" });
