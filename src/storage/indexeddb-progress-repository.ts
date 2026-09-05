@@ -34,8 +34,16 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
   public async load(): Promise<LearnerProgressV1> {
     const database = await this.getDatabase();
-    const storedProgress = await database.get("progress", PROGRESS_KEY);
-    return migrateProgress(storedProgress, this.now());
+    const transaction = database.transaction("progress", "readwrite");
+    const storedProgress = await transaction.store.get(PROGRESS_KEY);
+    const progress = migrateProgress(storedProgress, this.now());
+
+    if (storedProgress === undefined) {
+      await transaction.store.put(progress, PROGRESS_KEY);
+    }
+
+    await transaction.done;
+    return progress;
   }
 
   public async saveExerciseResult(
@@ -94,7 +102,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   public close(): void {
     const databasePromise = this.databasePromise;
     this.databasePromise = undefined;
-    void databasePromise?.then((database) => database.close());
+    void databasePromise?.then((database) => database.close()).catch(() => undefined);
   }
 
   private getDatabase(): Promise<IDBPDatabase<ProgressDatabase>> {

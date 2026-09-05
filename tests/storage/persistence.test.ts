@@ -54,4 +54,22 @@ describe("requestPersistentStorage", () => {
 
     await expect(requestPersistentStorage()).resolves.toBe("best-effort");
   });
+
+  test("returns best-effort when checking persistence rejects", async () => {
+    setStorage({
+      persisted: async () => Promise.reject(new Error("storage unavailable")),
+      persist: async () => true
+    } as StorageManager);
+
+    await expect(requestPersistentStorage()).resolves.toBe("best-effort");
+  });
+
+  test("returns best-effort when requesting persistence rejects", async () => {
+    setStorage({
+      persisted: async () => false,
+      persist: async () => Promise.reject(new Error("storage unavailable"))
+    } as StorageManager);
+
+    await expect(requestPersistentStorage()).resolves.toBe("best-effort");
+  });
 });

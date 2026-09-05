@@ -85,6 +85,21 @@ describe("IndexedDbProgressRepository", () => {
 
   });
 
+  test("materializes initial progress so startedAt survives reopening", async () => {
+    const repository = createRepository();
+    const initialProgress = await repository.load();
+    repository.close();
+
+    const reopened = new IndexedDbProgressRepository(databaseNames[0], () =>
+      new Date("2026-09-06T00:00:00.000Z")
+    );
+    repositories.push(reopened);
+
+    await expect(reopened.load()).resolves.toMatchObject({
+      startedAt: initialProgress.startedAt
+    });
+  });
+
   test("reopening restores the active mission and completed exercise", async () => {
     const repository = createRepository();
     await repository.saveExerciseResult({ missionId: "hotel", exerciseId: "listen-1" });
