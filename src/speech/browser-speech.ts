@@ -166,10 +166,9 @@ export class BrowserSpeech implements SpeechPort {
     let recorder: Recorder;
     try {
       recorder = new RecorderConstructor(stream);
-      recorder.start();
     } catch {
       stream.getTracks().forEach((track) => track.stop());
-      throw capabilityError("recording-failed", "Could not start recording.");
+      throw capabilityError("recording-failed", "Could not create a recorder.");
     }
     const chunks: BlobPart[] = [];
     let stopped: Promise<Blob> | undefined;
@@ -204,6 +203,12 @@ export class BrowserSpeech implements SpeechPort {
     recorder.addEventListener("dataavailable", data);
     recorder.addEventListener("stop", complete);
     recorder.addEventListener("error", failure);
+    try {
+      recorder.start();
+    } catch {
+      failure();
+    }
+    if (terminalError) throw terminalError;
     return {
       stop: () => {
         if (stopped) return stopped;
@@ -224,21 +229,26 @@ export class BrowserSpeech implements SpeechPort {
   async recognize(expectedLanguage: "en-US"): Promise<RecognitionResult | null> {
     const RecognitionConstructor = this.dependencies.SpeechRecognition;
     if (!RecognitionConstructor) throw capabilityError("unsupported", "Automatic recognition is unavailable.");
-    const recognition = new RecognitionConstructor();
-    recognition.lang = expectedLanguage;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    let recognition: Recognition;
+    try {
+      recognition = new RecognitionConstructor();
+      recognition.lang = expectedLanguage;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+    } catch {
+      throw capabilityError("recognition-failed", "Speech recognition could not be configured.");
+    }
     const timeoutMs = this.dependencies.recognitionTimeoutMs ?? 10_000;
     const later = this.dependencies.setTimeout ?? ((handler, timeout) => setTimeout(handler, timeout));
     const cancelLater = this.dependencies.clearTimeout ?? ((timer) => clearTimeout(timer));
     return new Promise<RecognitionResult | null>((resolve, reject) => {
       let done = false;
-      let timer: ReturnType<typeof setTimeout>;
+      let timer: ReturnType<typeof setTimeout> | null = null;
       const clean = () => {
         recognition.removeEventListener("result", result);
         recognition.removeEventListener("error", error);
         recognition.removeEventListener("end", ended);
-        cancelLater(timer);
+        if (timer !== null) cancelLater(timer);
       };
       const finish = (value: RecognitionResult | null, failure?: SpeechCapabilityError) => {
         if (done) return;
@@ -264,9 +274,11 @@ export class BrowserSpeech implements SpeechPort {
       recognition.addEventListener("error", error);
       recognition.addEventListener("end", ended);
       timer = later(() => {
-        try { recognition.abort?.(); recognition.stop?.(); } catch { /* browser implementations vary */ }
         finish(null, capabilityError("timeout", "Speech recognition timed out."));
+        try { recognition.abort?.(); } catch { /* browser implementations vary */ }
+        try { recognition.stop?.(); } catch { /* browser implementations vary */ }
       }, timeoutMs);
+      if (done && timer !== null) cancelLater(timer);
       try { recognition.start(); } catch { finish(null, capabilityError("recognition-failed", "Speech recognition could not start.")); }
     });
   }

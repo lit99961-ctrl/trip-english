@@ -61,4 +61,33 @@ describe("readSelectedEnglish", () => {
     for (const type of ["contextmenu", "touchstart", "selectionchange"]) { const event = new Event(type, { cancelable: true }); document.dispatchEvent(event); expect(event.defaultPrevented).toBe(false); }
     controller.destroy(); expect(document.querySelector("[data-selection-actions]")).toBeNull();
   });
+
+  it("replaces an existing controller for the same document without duplicate bars", () => {
+    document.body.innerHTML = '<p data-english><span>delayed</span></p>';
+    const range = document.createRange(); range.selectNodeContents(document.querySelector("span")!);
+    const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+    const first = new SelectionController({ speech: { speak: vi.fn() }, onLookup: vi.fn(), onSave: vi.fn() });
+    const secondLookup = vi.fn();
+    const second = new SelectionController({ speech: { speak: vi.fn() }, onLookup: secondLookup, onSave: vi.fn() });
+    document.dispatchEvent(new Event("selectionchange"));
+
+    expect(document.querySelectorAll("[data-selection-actions]")).toHaveLength(1);
+    first.destroy();
+    document.querySelector<HTMLButtonElement>("button[aria-label='中文']")!.click();
+    expect(secondLookup).toHaveBeenCalledWith("delayed");
+    second.destroy();
+  });
+
+  it("reports rejected speech actions without leaking a rejection", async () => {
+    document.body.innerHTML = '<p data-english><span>delayed</span></p>';
+    const error = new Error("voice unavailable"); const onError = vi.fn();
+    const controller = new SelectionController({ speech: { speak: vi.fn().mockRejectedValue(error) }, onLookup: vi.fn(), onSave: vi.fn(), onError });
+    const range = document.createRange(); range.selectNodeContents(document.querySelector("span")!);
+    const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range); document.dispatchEvent(new Event("selectionchange"));
+    document.querySelector<HTMLButtonElement>("button[aria-label='朗读']")!.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith(error);
+    controller.destroy();
+  });
 });

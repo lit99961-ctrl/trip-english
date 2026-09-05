@@ -6,6 +6,7 @@ class Events {
   addEventListener(type: string, listener: (event: any) => void) { (this.listeners.get(type) ?? this.listeners.set(type, new Set()).get(type)!).add(listener); }
   removeEventListener(type: string, listener: (event: any) => void) { this.listeners.get(type)?.delete(listener); }
   emit(type: string, event: any = {}) { this.listeners.get(type)?.forEach((listener) => listener(event)); }
+  listenerCount(type: string) { return this.listeners.get(type)?.size ?? 0; }
 }
 class FakeAudio extends Events { playbackRate = 1; async play() {} }
 class FakeUtterance extends Events { lang = ""; rate = 1; constructor(readonly text: string) { super(); } }
@@ -13,6 +14,9 @@ class FakeSynthesis { utterance: FakeUtterance | null = null; cancelled = false;
 class FakeTrack { stopped = false; stop() { this.stopped = true; } }
 class FakeRecorder extends Events { state = "inactive"; mimeType = "audio/webm"; start() { this.state = "recording"; } stop() { this.state = "inactive"; this.emit("stop"); } }
 class FakeRecognition extends Events { lang = ""; interimResults = true; maxAlternatives = 0; aborted = false; start() {} abort() { this.aborted = true; } }
+class SyncErrorRecorder extends FakeRecorder { override start() { this.state = "recording"; this.emit("error"); } }
+class TimeoutRaceRecognition extends FakeRecognition { override abort() { this.aborted = true; this.emit("error", { error: "network" }); this.emit("end"); } }
+class AbortThrowingRecognition extends FakeRecognition { stopped = false; override abort() { throw new Error("abort failed"); } stop() { this.stopped = true; } }
 
 describe("BrowserSpeech", () => {
   it("uses self-rating when recognition is unavailable", async () => {
@@ -35,6 +39,16 @@ describe("BrowserSpeech", () => {
     const failed = speech.playFixed("/delayed.mp3", 1);
     audio.emit("error");
     await expect(failed).rejects.toMatchObject({ code: "playback-failed" });
+  });
+
+  it("converts rejected audio playback into a typed failure and removes listeners", async () => {
+    const audio = new FakeAudio();
+    audio.play = () => Promise.reject(new Error("blocked"));
+    const result = new BrowserSpeech({ createAudio: () => audio }).playFixed("/blocked.mp3", 1);
+
+    await expect(result).rejects.toMatchObject({ code: "playback-failed" });
+    expect(audio.listenerCount("ended")).toBe(0);
+    expect(audio.listenerCount("error")).toBe(0);
   });
 
   it("speaks English at its exact rate and reports synthesis failure", async () => {
@@ -86,6 +100,19 @@ describe("BrowserSpeech", () => {
     expect(track.stopped).toBe(true);
   });
 
+  it("rejects a recorder that emits an error synchronously from start", async () => {
+    const track = new FakeTrack();
+    const recorder = new SyncErrorRecorder();
+    const speech = new BrowserSpeech({
+      getUserMedia: async () => ({ getTracks: () => [track] }) as unknown as MediaStream,
+      MediaRecorder: class { constructor() { return recorder; } } as unknown as typeof MediaRecorder
+    });
+
+    await expect(speech.startRecording()).rejects.toMatchObject({ code: "recording-failed" });
+    expect(track.stopped).toBe(true);
+    expect(recorder.listenerCount("error")).toBe(0);
+  });
+
   it("returns normalized recognition and resolves no speech as null", async () => {
     const recognition = new FakeRecognition();
     const speech = new BrowserSpeech({ SpeechRecognition: class { constructor() { return recognition; } } as unknown as typeof FakeRecognition });
@@ -107,6 +134,21 @@ describe("BrowserSpeech", () => {
     await expect(result).rejects.toMatchObject({ code });
   });
 
+  it("converts recognition construction and configuration failures", async () => {
+    const construction = new BrowserSpeech({ SpeechRecognition: class { constructor() { throw new Error("no constructor"); } } as unknown as typeof FakeRecognition });
+    class ConfigFailingRecognition extends Events {
+      get lang() { return ""; }
+      set lang(value: string) { throw new Error(value); }
+      interimResults = false;
+      maxAlternatives = 0;
+      start() {}
+    }
+    const configured = new BrowserSpeech({ SpeechRecognition: ConfigFailingRecognition as unknown as typeof FakeRecognition });
+
+    await expect(construction.recognize("en-US")).rejects.toMatchObject({ code: "recognition-failed" });
+    await expect(configured.recognize("en-US")).rejects.toMatchObject({ code: "recognition-failed" });
+  });
+
   it("aborts and fails timed-out recognition", async () => {
     const recognition = new FakeRecognition();
     let timer: (() => void) | undefined;
@@ -120,5 +162,32 @@ describe("BrowserSpeech", () => {
     timer?.();
     await expect(result).rejects.toMatchObject({ code: "timeout" });
     expect(recognition.aborted).toBe(true);
+  });
+
+  it("settles timeout before abort-triggered recognition events", async () => {
+    const recognition = new TimeoutRaceRecognition();
+    let timer: (() => void) | undefined;
+    const speech = new BrowserSpeech({
+      SpeechRecognition: class { constructor() { return recognition; } } as unknown as typeof FakeRecognition,
+      setTimeout: (handler) => { timer = handler; return 1 as unknown as ReturnType<typeof setTimeout>; },
+      clearTimeout: () => undefined
+    });
+    const result = speech.recognize("en-US");
+    timer?.();
+
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
+    expect(recognition.listenerCount("error")).toBe(0);
+  });
+
+  it("still tries to stop recognition when abort throws during timeout", async () => {
+    const recognition = new AbortThrowingRecognition(); let timer: (() => void) | undefined;
+    const speech = new BrowserSpeech({
+      SpeechRecognition: class { constructor() { return recognition; } } as unknown as typeof FakeRecognition,
+      setTimeout: (handler) => { timer = handler; return 1 as unknown as ReturnType<typeof setTimeout>; }, clearTimeout: () => undefined
+    });
+    const result = speech.recognize("en-US"); timer?.();
+
+    await expect(result).rejects.toMatchObject({ code: "timeout" });
+    expect(recognition.stopped).toBe(true);
   });
 });

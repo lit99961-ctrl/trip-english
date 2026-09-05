@@ -11,7 +11,10 @@ export interface SelectionControllerOptions {
   speech: Pick<SpeechPort, "speak">;
   onLookup(text: string): void;
   onSave(text: string): void;
+  onError?: ((error: unknown) => void) | undefined;
 }
+
+const controllers = new WeakMap<Document, SelectionController>();
 
 function closestEnglishRegion(node: Node | null): HTMLElement | null {
   const element = node instanceof Element ? node : node?.parentElement;
@@ -25,12 +28,15 @@ export class SelectionController {
 
   constructor(private readonly options: SelectionControllerOptions) {
     this.document = options.document ?? document;
+    controllers.get(this.document)?.destroy();
+    controllers.set(this.document, this);
     this.document.addEventListener("selectionchange", this.update);
     this.update();
   }
 
   destroy(): void {
     this.document.removeEventListener("selectionchange", this.update);
+    if (controllers.get(this.document) === this) controllers.delete(this.document);
     this.hide();
   }
 
@@ -59,8 +65,8 @@ export class SelectionController {
       button.addEventListener("click", callback);
       bar.append(button);
     };
-    action("朗读", () => { if (this.selectedText) void this.options.speech.speak(this.selectedText, 1); });
-    action("慢速", () => { if (this.selectedText) void this.options.speech.speak(this.selectedText, 0.75); });
+    action("朗读", () => { if (this.selectedText) this.play(this.selectedText, 1); });
+    action("慢速", () => { if (this.selectedText) this.play(this.selectedText, 0.75); });
     action("中文", () => { if (this.selectedText) this.options.onLookup(this.selectedText); });
     action("加入复习", () => { if (this.selectedText) this.options.onSave(this.selectedText); });
     this.document.body.append(bar);
@@ -71,5 +77,11 @@ export class SelectionController {
     this.selectedText = null;
     this.bar?.remove();
     this.bar = null;
+  }
+
+  private play(text: string, rate: 1 | 0.75): void {
+    void this.options.speech.speak(text, rate).catch((error: unknown) => {
+      try { this.options.onError?.(error); } catch { /* reporting must not leak another rejection */ }
+    });
   }
 }
