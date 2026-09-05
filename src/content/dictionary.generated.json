@@ -79,6 +79,15 @@
     ]
   },
   {
+    "word": "allergies",
+    "phonetic": "ˈælədʒi:z",
+    "chinese": "n. [医]过敏症",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "allergy",
     "phonetic": "'ælәdʒi",
     "chinese": "n. 变应性, 反感, 厌恶",
@@ -187,6 +196,17 @@
     ]
   },
   {
+    "word": "attachment",
+    "phonetic": "ә'tʃætʃmәnt",
+    "chinese": "n. 连接, 附属物, 连接物, 爱慕",
+    "tags": [
+      "catalog",
+      "cet6",
+      "ecdict",
+      "toefl"
+    ]
+  },
+  {
     "word": "back",
     "phonetic": "bæk",
     "chinese": "a. 后面的",
@@ -243,6 +263,18 @@
     ]
   },
   {
+    "word": "before",
+    "phonetic": "bi'fɒ:",
+    "chinese": "prep. 在...之前",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "bill",
     "phonetic": "bil",
     "chinese": "n. 帐单, 清单, 钞票, 鸟嘴, 广告, 法案, 票据",
@@ -268,6 +300,23 @@
       "gk",
       "gre",
       "oxford"
+    ]
+  },
+  {
+    "word": "board",
+    "phonetic": "bɒ:d",
+    "chinese": "n. 木板, 甲板, 膳食, 会议桌",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ielts",
+      "ky",
+      "oxford",
+      "toefl",
+      "zk"
     ]
   },
   {
@@ -553,6 +602,27 @@
     ]
   },
   {
+    "word": "closes",
+    "phonetic": "kləuziz",
+    "chinese": "v. （使）关, 关闭( close的第三人称单数 )",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
+    "word": "color",
+    "phonetic": "'kʌlә",
+    "chinese": "n. 颜色, 面色, 颜料, 外貌",
+    "tags": [
+      "catalog",
+      "cet4",
+      "ecdict",
+      "ielts",
+      "ky"
+    ]
+  },
+  {
     "word": "come",
     "phonetic": "kʌm",
     "chinese": "vi. 过来, 来, 到达, 出现, 开始",
@@ -658,9 +728,65 @@
     ]
   },
   {
+    "word": "decision",
+    "phonetic": "di'siʒәn",
+    "chinese": "n. 决定, 决心, 决断",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ielts",
+      "ky",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "delay",
+    "phonetic": "di'lei",
+    "chinese": "n. 耽搁, 迟滞",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ielts",
+      "ky",
+      "oxford",
+      "toefl"
+    ]
+  },
+  {
     "word": "delayed",
     "phonetic": "di'leid",
     "chinese": "a. 定时的",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
+    "word": "departure",
+    "phonetic": "di'pɑ:tʃә",
+    "chinese": "n. 离开, 出发, 违背, 偏离",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ky",
+      "oxford",
+      "toefl"
+    ]
+  },
+  {
+    "word": "departures",
+    "phonetic": null,
+    "chinese": "n. 出发",
     "tags": [
       "catalog",
       "ecdict"
@@ -767,6 +893,22 @@
     ]
   },
   {
+    "word": "emergency",
+    "phonetic": "i'mә:dʒәnsi",
+    "chinese": "n. 紧急状况, 紧急事件, 紧急需要",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "gre",
+      "ielts",
+      "ky",
+      "oxford"
+    ]
+  },
+  {
     "word": "enough",
     "phonetic": "i'nʌf",
     "chinese": "n. 充足, 够, 很多",
@@ -782,6 +924,23 @@
     "word": "entrance",
     "phonetic": "'entrәns",
     "chinese": "n. 入口, 进入点, 入场, 入学, 进入, 开始(阶段), 就任",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "gre",
+      "ielts",
+      "ky",
+      "oxford",
+      "toefl"
+    ]
+  },
+  {
+    "word": "entry",
+    "phonetic": "'entri",
+    "chinese": "n. 登录, 条目, 进入, 入口, 报关",
     "tags": [
       "catalog",
       "cet4",
@@ -997,6 +1156,15 @@
     ]
   },
   {
+    "word": "gates",
+    "phonetic": null,
+    "chinese": "n. 大门",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "get",
     "phonetic": "get",
     "chinese": "vt. 得到, 获得, 变成, 使得, 收获, 接通, 抓住, 染上",
@@ -1038,6 +1206,15 @@
     "tags": [
       "catalog",
       "manual"
+    ]
+  },
+  {
+    "word": "grindelwald",
+    "phonetic": null,
+    "chinese": "格林德沃（《哈利波特》人物名）",
+    "tags": [
+      "catalog",
+      "ecdict"
     ]
   },
   {
@@ -1113,6 +1290,15 @@
     ]
   },
   {
+    "word": "helsinki",
+    "phonetic": "'helsiŋki",
+    "chinese": "n. 赫尔辛基",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "here",
     "phonetic": "hiә",
     "chinese": "adv. 在这里, 此时, 这里",
@@ -1122,6 +1308,15 @@
       "gk",
       "oxford",
       "zk"
+    ]
+  },
+  {
+    "word": "hong",
+    "phonetic": "hɔŋ",
+    "chinese": "n. （中国、日本的）行, 商行",
+    "tags": [
+      "catalog",
+      "ecdict"
     ]
   },
   {
@@ -1295,6 +1490,25 @@
     ]
   },
   {
+    "word": "kiosk",
+    "phonetic": "ki'ɒsk",
+    "chinese": "n. 亭, 凉亭, 报摊",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gre"
+    ]
+  },
+  {
+    "word": "kong",
+    "phonetic": "kɔŋ",
+    "chinese": "n. 含锡砾石下的无矿基岩",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "last",
     "phonetic": "lɑ:st",
     "chinese": "a. 最后的, 末尾的, 最近的",
@@ -1456,6 +1670,15 @@
     ]
   },
   {
+    "word": "lucerne",
+    "phonetic": "lu:'sә:n",
+    "chinese": "n. 苜蓿",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "lungern",
     "phonetic": null,
     "chinese": "伦根",
@@ -1585,6 +1808,26 @@
     "tags": [
       "catalog",
       "ecdict"
+    ]
+  },
+  {
+    "word": "milan",
+    "phonetic": "mi'læn",
+    "chinese": "n. 米兰",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
+    "word": "minutes",
+    "phonetic": null,
+    "chinese": "n. 会议记录",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gre",
+      "ielts"
     ]
   },
   {
@@ -1773,6 +2016,23 @@
     ]
   },
   {
+    "word": "notice",
+    "phonetic": "'nәutis",
+    "chinese": "n. 注意, 布告, 通知, 预告, 短评",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ielts",
+      "ky",
+      "oxford",
+      "toefl",
+      "zk"
+    ]
+  },
+  {
     "word": "now",
     "phonetic": "nau",
     "chinese": "adv. 现在, 刚才, 目前",
@@ -1887,6 +2147,21 @@
     ]
   },
   {
+    "word": "opening",
+    "phonetic": "'әupәniŋ",
+    "chinese": "n. 开始, 口子, 穴, 揭幕",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ielts",
+      "ky",
+      "oxford"
+    ]
+  },
+  {
     "word": "ordered",
     "phonetic": null,
     "chinese": "a. 安排好的, 有规律的, 有条理的, 整齐的",
@@ -1991,6 +2266,18 @@
       "ky",
       "oxford",
       "toefl"
+    ]
+  },
+  {
+    "word": "people",
+    "phonetic": "'pi:pl",
+    "chinese": "n. 人, 人民, 民族, 平民",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
+      "zk"
     ]
   },
   {
@@ -2104,6 +2391,19 @@
     ]
   },
   {
+    "word": "practice",
+    "phonetic": "'præktis",
+    "chinese": "n. 实践, 练习, 实行, 惯例, 习惯, 开业",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "ielts",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "problem",
     "phonetic": "'prɒblәm",
     "chinese": "n. 问题, 难题",
@@ -2113,6 +2413,21 @@
       "gk",
       "oxford",
       "zk"
+    ]
+  },
+  {
+    "word": "reading",
+    "phonetic": "'ri:diŋ",
+    "chinese": "n. 阅读, 知识, 读物",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ielts",
+      "ky",
+      "oxford"
     ]
   },
   {
@@ -2161,6 +2476,44 @@
       "ielts",
       "ky",
       "toefl"
+    ]
+  },
+  {
+    "word": "regional",
+    "phonetic": "'ri:dʒәnәl",
+    "chinese": "a. 地方的, 地域性的",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "ielts",
+      "oxford",
+      "toefl"
+    ]
+  },
+  {
+    "word": "request",
+    "phonetic": "ri'kwest",
+    "chinese": "n. 请求, 需要, 申请书",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "gre",
+      "ielts",
+      "ky",
+      "oxford",
+      "toefl"
+    ]
+  },
+  {
+    "word": "required",
+    "phonetic": "ri'kwaiәd",
+    "chinese": "a. 必需的",
+    "tags": [
+      "catalog",
+      "ecdict"
     ]
   },
   {
@@ -2263,6 +2616,15 @@
       "ielts",
       "oxford",
       "zk"
+    ]
+  },
+  {
+    "word": "says",
+    "phonetic": "sez",
+    "chinese": "v. 说（第三人称单数）",
+    "tags": [
+      "catalog",
+      "ecdict"
     ]
   },
   {
@@ -2704,6 +3066,15 @@
     ]
   },
   {
+    "word": "termini",
+    "phonetic": "'tә:minai",
+    "chinese": "目的地, 界标",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "thank",
     "phonetic": "θæŋk",
     "chinese": "n. 谢意, 感谢",
@@ -2778,6 +3149,16 @@
     ]
   },
   {
+    "word": "tickets",
+    "phonetic": null,
+    "chinese": "n. 票",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "ielts"
+    ]
+  },
+  {
     "word": "time",
     "phonetic": "taim",
     "chinese": "n. 时间, 时侯, 时机, 时期, 期限, 次数, 节拍, 暂停, 规定时间",
@@ -2788,6 +3169,29 @@
       "ielts",
       "oxford",
       "zk"
+    ]
+  },
+  {
+    "word": "times",
+    "phonetic": "taimz",
+    "chinese": "n. 时代, 境遇, 时报",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
+    "word": "timetable",
+    "phonetic": "'taimteibl",
+    "chinese": "n. 时间表",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ielts",
+      "oxford"
     ]
   },
   {
@@ -2865,6 +3269,22 @@
     ]
   },
   {
+    "word": "transfer",
+    "phonetic": "træns'fә:",
+    "chinese": "n. 迁移, 移动, 传递, 转让, 转移, 过户, 汇兑, 换车",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gre",
+      "ielts",
+      "ky",
+      "oxford",
+      "toefl"
+    ]
+  },
+  {
     "word": "transfers",
     "phonetic": null,
     "chinese": "n. 迁移",
@@ -2936,6 +3356,17 @@
     ]
   },
   {
+    "word": "us",
+    "phonetic": "ʌs",
+    "chinese": "pron. 我们",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "use",
     "phonetic": "ju:s",
     "chinese": "n. 使用, 习惯, 使用价值, 用法, 使用权",
@@ -2974,9 +3405,27 @@
     ]
   },
   {
+    "word": "vaporetto",
+    "phonetic": "vɑ:pәu'retәu",
+    "chinese": "n. (运河中载客的)交通汽艇",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "vatican",
     "phonetic": "'vætikәn",
     "chinese": "n. 梵蒂冈, 罗马教廷",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
+    "word": "venice",
+    "phonetic": "'venis",
+    "chinese": "n. 威尼斯",
     "tags": [
       "catalog",
       "ecdict"
@@ -3039,6 +3488,15 @@
       "oxford",
       "toefl",
       "zk"
+    ]
+  },
+  {
+    "word": "wc",
+    "phonetic": null,
+    "chinese": "厕所",
+    "tags": [
+      "catalog",
+      "ecdict"
     ]
   },
   {
@@ -3614,17 +4072,6 @@
     "chinese": "n. 更多",
     "tags": [
       "ecdict",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "people",
-    "phonetic": "'pi:pl",
-    "chinese": "n. 人, 人民, 民族, 平民",
-    "tags": [
-      "ecdict",
-      "gk",
       "oxford",
       "zk"
     ]
@@ -4587,17 +5034,6 @@
       "ecdict",
       "gk",
       "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "before",
-    "phonetic": "bi'fɒ:",
-    "chinese": "prep. 在...之前",
-    "tags": [
-      "ecdict",
-      "gk",
       "oxford",
       "zk"
     ]
@@ -6440,21 +6876,6 @@
     ]
   },
   {
-    "word": "decision",
-    "phonetic": "di'siʒәn",
-    "chinese": "n. 决定, 决心, 决断",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
     "word": "until",
     "phonetic": "әn'til",
     "chinese": "prep. 直到, 在...以前",
@@ -7274,18 +7695,6 @@
       "ecdict",
       "gk",
       "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "practice",
-    "phonetic": "'præktis",
-    "chinese": "n. 实践, 练习, 实行, 惯例, 习惯, 开业",
-    "tags": [
-      "ecdict",
-      "gk",
-      "ielts",
       "oxford",
       "zk"
     ]
@@ -9013,22 +9422,6 @@
     ]
   },
   {
-    "word": "board",
-    "phonetic": "bɒ:d",
-    "chinese": "n. 木板, 甲板, 膳食, 会议桌",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
     "word": "king",
     "phonetic": "kiŋ",
     "chinese": "n. 国王, 君主",
@@ -9050,16 +9443,6 @@
       "ecdict",
       "gk",
       "ielts",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "us",
-    "phonetic": "ʌs",
-    "chinese": "pron. 我们",
-    "tags": [
-      "ecdict",
       "oxford",
       "zk"
     ]
@@ -12145,468 +12528,6 @@
       "ky",
       "oxford",
       "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "specific",
-    "phonetic": "spi'sifik",
-    "chinese": "n. 特效药, 特性",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "appropriate",
-    "phonetic": "ә'prәupriәt",
-    "chinese": "a. 适当的",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "profit",
-    "phonetic": "'prɒfit",
-    "chinese": "n. 利润, 赢利, 利益",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "reflect",
-    "phonetic": "ri'flekt",
-    "chinese": "vt. 反射, 反映, 招致, 深思",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ky",
-      "oxford"
-    ]
-  },
-  {
-    "word": "assume",
-    "phonetic": "ә'sju:m",
-    "chinese": "vt. 假定, 承担, 呈现",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "admit",
-    "phonetic": "әd'mit",
-    "chinese": "vt. 承认, 接受, 允许进入, 容许",
-    "tags": [
-      "cet4",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "stone",
-    "phonetic": "stәun",
-    "chinese": "n. 石头, 宝石, 果核, 纪念碑, 结石",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "measure",
-    "phonetic": "'meʒә",
-    "chinese": "n. 尺寸, 量度器, 量度标准, 测量, 量具, 程度, 范围, 限度, 分寸, 措施, 方法",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford"
-    ]
-  },
-  {
-    "word": "conference",
-    "phonetic": "'kɒnfәrәns",
-    "chinese": "n. 会议",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "division",
-    "phonetic": "di'viʒәn",
-    "chinese": "n. 分, 分开, 除法, 部门(如部、处、系等), 师",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "smile",
-    "phonetic": "smail",
-    "chinese": "n. 微笑, 喜色, 笑容",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "prepare",
-    "phonetic": "pri'pєә",
-    "chinese": "vt. 准备, 筹备, 使在思想上有准备, 制造, 调制",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "replace",
-    "phonetic": "ri'pleis",
-    "chinese": "vt. 代替, 替换, 放回, 归还",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "post",
-    "phonetic": "pәust",
-    "chinese": "n. 柱, 杆, 准星, 邮件, 邮政, 标竿, 职位, 岗位, 哨所, 兵营",
-    "tags": [
-      "ecdict",
-      "gk",
-      "ielts",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "procedure",
-    "phonetic": "prә'si:dʒә",
-    "chinese": "n. 程序, 过程, 手续",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "commission",
-    "phonetic": "kә'miʃәn",
-    "chinese": "n. 委任状, 任官令, 所委职责, 佣金, 犯, 委托, 所托之事",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gre",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "proposal",
-    "phonetic": "prә'pәuzl",
-    "chinese": "n. 提议, 计划, 求婚",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gre",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "fill",
-    "phonetic": "fil",
-    "chinese": "vt. 装满, 填充, 弥漫, 供给, 满足, 供应",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "unless",
-    "phonetic": ".ʌn'les",
-    "chinese": "conj. 除非",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "mention",
-    "phonetic": "'menʃәn",
-    "chinese": "n. 提到, 言及, 陈述",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "improve",
-    "phonetic": "im'pru:v",
-    "chinese": "vt. 改良, 提高...的价值, 改善, 利用",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "image",
-    "phonetic": "'imidʒ",
-    "chinese": "n. 影像, 肖像, 想象, 图像, 形象, 翻版",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "circumstance",
-    "phonetic": "'sә:kәmstәns",
-    "chinese": "n. 环境, 状况, 事件",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "oil",
-    "phonetic": "ɒil",
-    "chinese": "n. 油, 石油, 油画颜料",
-    "tags": [
-      "cet4",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "client",
-    "phonetic": "'klaiәnt",
-    "chinese": "n. 客户, 顾客, 委托人",
-    "tags": [
-      "cet6",
-      "ecdict",
-      "ielts",
-      "ky",
-      "oxford"
-    ]
-  },
-  {
-    "word": "obviously",
-    "phonetic": "'ɔbviәsli",
-    "chinese": "adv. 显而易见地, 明显地",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "oxford"
-    ]
-  },
-  {
-    "word": "sector",
-    "phonetic": "'sektә",
-    "chinese": "n. 扇形, 部门, 部分, 函数尺, 象限仪, 段, 区段",
-    "tags": [
-      "cet6",
-      "ecdict",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "direction",
-    "phonetic": "di'rekʃәn",
-    "chinese": "n. 方向, 指导, 趋势",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "basic",
-    "phonetic": "'beisik",
-    "chinese": "n. 基本原理, 要素, 基本规律",
-    "tags": [
-      "cet4",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "attack",
-    "phonetic": "ә'tæk",
-    "chinese": "n. 攻击, 抨击",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford"
-    ]
-  },
-  {
-    "word": "successful",
-    "phonetic": "sәk'sesful",
-    "chinese": "a. 成功的, 一帆风顺的, 顺利的",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "intend",
-    "phonetic": "in'tend",
-    "chinese": "vt. 计划, 打算, 意思是",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford"
-    ]
-  },
-  {
-    "word": "fight",
-    "phonetic": "fait",
-    "chinese": "n. 打架, 争吵, 斗志",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
       "zk"
     ]
   }

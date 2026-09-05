@@ -37,20 +37,24 @@ function normalizeEnglishWords(text: string): string[] {
   return normalized.match(/[\p{L}]+(?:['-][\p{L}]+)*/gu) ?? [];
 }
 
-function catalogWords(): string[] {
-  const productionEnglish = allMissions.flatMap((mission) =>
-    mission.productionPhrases.map((phrase) => phrase.english)
-  );
-  const businessReading = allMissions
-    .filter((mission) => mission.kind === "business")
-    .flatMap((mission) => mission.exercises)
-    .filter((exercise) => exercise.type === "reading")
-    .map((exercise) => exercise.readingText);
-  return [...new Set([
-    ...productionEnglish,
-    ...businessReading,
-    ...emergencyPhrases.map((phrase) => phrase.english)
-  ].flatMap(normalizeEnglishWords).filter((word) => word.length > 1))].sort();
+function displayedEnglishWords(): string[] {
+  const displayedText: string[] = [];
+  for (const mission of allMissions) {
+    displayedText.push(mission.city, ...mission.recognitionWords);
+    displayedText.push(...mission.productionPhrases.map((phrase) => phrase.english));
+    for (const exercise of mission.exercises) {
+      if (exercise.type === "reading") {
+        displayedText.push(exercise.readingText);
+        displayedText.push(...exercise.questions.flatMap((question) => question.expectedAnswers));
+      }
+      if (exercise.type === "roleplay") {
+        displayedText.push(courseCatalog.renderRoleplayPrompt(exercise.promptTemplate, exercise.variation));
+        displayedText.push(...Object.values(exercise.variation));
+      }
+    }
+  }
+  displayedText.push(...emergencyPhrases.map((phrase) => phrase.english));
+  return [...new Set(displayedText.flatMap(normalizeEnglishWords).filter((word) => word.length > 1))].sort();
 }
 
 function listAiffFiles(path: string): string[] {
@@ -85,7 +89,7 @@ describe("generated offline dictionary", () => {
   it("includes required and every normalized catalog word without sensitive strings", () => {
     const dictionary = readDictionary();
     const words = new Set(dictionary.map((entry) => entry.word));
-    for (const required of ["reservation", "platform", "delayed", "deadline", "boarding", ...catalogWords()]) {
+    for (const required of ["reservation", "platform", "delayed", "deadline", "boarding", ...displayedEnglishWords()]) {
       expect(words.has(required), `missing dictionary word: ${required}`).toBe(true);
     }
     expect(JSON.stringify(dictionary)).not.toMatch(/(?:[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\+?\d[\d ()-]{6,}\d)/);
@@ -109,6 +113,22 @@ describe("generated offline dictionary", () => {
     ], { encoding: "utf8" });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(pinnedSha);
+  });
+
+  it("selects the same ranked dictionary regardless of source insertion order", () => {
+    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/build-dictionary.mjs")).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+      import { selectEntries } from ${JSON.stringify(moduleUrl)};
+      const catalog = new Map([["catalog", { word: "catalog", phonetic: null, chinese: "目录", tags: ["catalog"], bnc: Infinity, frq: Infinity }]]);
+      const fillers = Array.from({ length: 999 }, (_, index) => ({
+        word: \`word-\${String(index).padStart(3, "0")}\`, phonetic: null, chinese: "词", tags: ["ecdict"],
+        bnc: index % 7 + 1, frq: index % 11 + 1
+      }));
+      const first = selectEntries(new Set(["catalog"]), new Map(catalog), new Map(fillers.map((entry) => [entry.word, entry])));
+      const second = selectEntries(new Set(["catalog"]), new Map(catalog), new Map([...fillers].reverse().map((entry) => [entry.word, entry])));
+      if (first.length !== 1000 || JSON.stringify(first) !== JSON.stringify(second)) throw new Error("selection is not stable");
+    `], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
   });
 });
 

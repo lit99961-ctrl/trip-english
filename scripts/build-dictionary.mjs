@@ -93,17 +93,8 @@ function tagsFor(row, catalog) {
 async function loadCatalogWords() {
   const server = await createServer({ root: projectRoot, logLevel: "error", server: { middlewareMode: true }, appType: "custom" });
   try {
-    const catalogModule = await server.ssrLoadModule("/src/content/catalog.ts");
-    const emergencyModule = await server.ssrLoadModule("/src/content/emergency-phrases.ts");
-    const missions = catalogModule.allMissions;
-    const productionEnglish = missions.flatMap((mission) => mission.productionPhrases.map((phrase) => phrase.english));
-    const businessReading = missions
-      .filter((mission) => mission.kind === "business")
-      .flatMap((mission) => mission.exercises)
-      .filter((exercise) => exercise.type === "reading")
-      .map((exercise) => exercise.readingText);
-    const emergencyEnglish = emergencyModule.emergencyPhrases.map((phrase) => phrase.english);
-    return new Set([...productionEnglish, ...businessReading, ...emergencyEnglish]
+    const displayedModule = await server.ssrLoadModule("/src/content/displayed-english.ts");
+    return new Set(displayedModule.displayedEnglish
       .flatMap(normalizeEnglishWords)
       .filter((word) => word.length > 1));
   } finally {
@@ -160,7 +151,7 @@ function withoutRanks(entry) {
   return { word: entry.word, phonetic: entry.phonetic, chinese: entry.chinese, tags: entry.tags };
 }
 
-function selectEntries(catalogWords, catalogEntries, fillerEntries) {
+export function selectEntries(catalogWords, catalogEntries, fillerEntries) {
   for (const word of [...catalogWords].sort()) {
     if (!catalogEntries.has(word) && manualOverrides.has(word)) {
       catalogEntries.set(word, { word, phonetic: null, chinese: manualOverrides.get(word), tags: ["catalog", "manual"], bnc: Number.POSITIVE_INFINITY, frq: Number.POSITIVE_INFINITY });
