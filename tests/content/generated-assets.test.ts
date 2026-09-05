@@ -95,6 +95,47 @@ describe("generated offline dictionary", () => {
     expect(JSON.stringify(dictionary)).not.toMatch(/(?:[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\+?\d[\d ()-]{6,}\d)/);
   });
 
+  it("uses audited course-context meanings for displayed proper names", () => {
+    const dictionary = new Map(readDictionary().map((entry) => [entry.word, entry]));
+    const properNames = {
+      alex: "亚历克斯（人名）",
+      bright: "Bright App（示例应用名）",
+      florence: "佛罗伦萨（意大利城市）",
+      gornergrat: "戈尔内格拉特（瑞士山地）",
+      grindelwald: "格林德瓦（瑞士地名）",
+      helsinki: "赫尔辛基（芬兰城市）",
+      hong: "香港（Hong Kong 地名组成）",
+      interlaken: "因特拉肯（瑞士城市）",
+      italy: "意大利（国家）",
+      kong: "香港（Hong Kong 地名组成）",
+      leo: "利奥（人名）",
+      leonardo: "莱昂纳多特快列车（机场列车）",
+      li: "李（姓氏）",
+      lucerne: "卢塞恩（瑞士城市）",
+      lungern: "伦根（瑞士城镇）",
+      mia: "米娅（人名）",
+      milan: "米兰（意大利城市）",
+      rialto: "里亚托（威尼斯地名/里亚托桥）",
+      rome: "罗马（意大利城市）",
+      switzerland: "瑞士（国家）",
+      termini: "罗马特米尼火车站",
+      vatican: "梵蒂冈（梵蒂冈博物馆）",
+      venice: "威尼斯（意大利城市）",
+      zermatt: "采尔马特（瑞士城镇）",
+      zurich: "苏黎世（瑞士城市）"
+    } as const;
+
+    for (const [word, chinese] of Object.entries(properNames)) {
+      expect(dictionary.get(word)?.chinese, word).toBe(chinese);
+      expect(dictionary.get(word)?.tags, word).toEqual(expect.arrayContaining([
+        "catalog", "context", "manual", "proper-name"
+      ]));
+    }
+    for (const word of ["leo", "lucerne", "rialto", "rome", "termini", "zurich"]) {
+      expect(dictionary.get(word)?.phonetic, `${word} should retain ECDICT phonetic`).toEqual(expect.any(String));
+    }
+  });
+
   it("pins ECDICT and records its license and transformation", () => {
     const script = readText(join(projectRoot, "scripts/build-dictionary.mjs"));
     const notice = readText(join(projectRoot, "THIRD_PARTY_NOTICES.md"));

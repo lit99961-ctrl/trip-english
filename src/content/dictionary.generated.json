@@ -60,10 +60,13 @@
   {
     "word": "alex",
     "phonetic": null,
-    "chinese": "[计] 开放网络文件系统",
+    "chinese": "亚历克斯（人名）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -359,12 +362,15 @@
   {
     "word": "bright",
     "phonetic": "brait",
-    "chinese": "a. 明亮的, 聪明的, 鲜明的, 欢快的",
+    "chinese": "Bright App（示例应用名）",
     "tags": [
       "catalog",
+      "context",
       "ecdict",
       "gk",
+      "manual",
       "oxford",
+      "proper-name",
       "zk"
     ]
   },
@@ -1063,10 +1069,13 @@
   {
     "word": "florence",
     "phonetic": "'flɒ:rәns",
-    "chinese": "n. 佛罗伦萨(意大利城市)",
+    "chinese": "佛罗伦萨（意大利城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1202,19 +1211,24 @@
   {
     "word": "gornergrat",
     "phonetic": null,
-    "chinese": "戈尔内格拉特",
+    "chinese": "戈尔内格拉特（瑞士山地）",
     "tags": [
       "catalog",
-      "manual"
+      "context",
+      "manual",
+      "proper-name"
     ]
   },
   {
     "word": "grindelwald",
     "phonetic": null,
-    "chinese": "格林德沃（《哈利波特》人物名）",
+    "chinese": "格林德瓦（瑞士地名）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1292,10 +1306,13 @@
   {
     "word": "helsinki",
     "phonetic": "'helsiŋki",
-    "chinese": "n. 赫尔辛基",
+    "chinese": "赫尔辛基（芬兰城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1313,10 +1330,13 @@
   {
     "word": "hong",
     "phonetic": "hɔŋ",
-    "chinese": "n. （中国、日本的）行, 商行",
+    "chinese": "香港（Hong Kong 地名组成）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1397,10 +1417,13 @@
   {
     "word": "interlaken",
     "phonetic": null,
-    "chinese": "n. 茵特拉肯（瑞士地名）",
+    "chinese": "因特拉肯（瑞士城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1442,12 +1465,15 @@
   {
     "word": "italy",
     "phonetic": "'itәli",
-    "chinese": "n. 意大利",
+    "chinese": "意大利（国家）",
     "tags": [
       "catalog",
+      "context",
       "ecdict",
       "gk",
-      "ielts"
+      "ielts",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1502,10 +1528,13 @@
   {
     "word": "kong",
     "phonetic": "kɔŋ",
-    "chinese": "n. 含锡砾石下的无矿基岩",
+    "chinese": "香港（Hong Kong 地名组成）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1564,28 +1593,37 @@
   {
     "word": "leo",
     "phonetic": "'li:ou",
-    "chinese": "n. 狮子, 狮子座",
+    "chinese": "利奥（人名）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
     "word": "leonardo",
     "phonetic": null,
-    "chinese": "n. 李奥纳多（姓氏）",
+    "chinese": "莱昂纳多特快列车（机场列车）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
     "word": "li",
     "phonetic": "li:",
-    "chinese": "[医] 锂(3号元素)",
+    "chinese": "李（姓氏）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1672,19 +1710,24 @@
   {
     "word": "lucerne",
     "phonetic": "lu:'sә:n",
-    "chinese": "n. 苜蓿",
+    "chinese": "卢塞恩（瑞士城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
     "word": "lungern",
     "phonetic": null,
-    "chinese": "伦根",
+    "chinese": "伦根（瑞士城镇）",
     "tags": [
       "catalog",
-      "manual"
+      "context",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -1804,19 +1847,25 @@
   {
     "word": "mia",
     "phonetic": null,
-    "chinese": "abbr. 战斗中失踪的（Missing In Action）",
+    "chinese": "米娅（人名）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
     "word": "milan",
     "phonetic": "mi'læn",
-    "chinese": "n. 米兰",
+    "chinese": "米兰（意大利城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -2534,10 +2583,13 @@
   {
     "word": "rialto",
     "phonetic": "ri'æltәu",
-    "chinese": "市场交易所",
+    "chinese": "里亚托（威尼斯地名/里亚托桥）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -2555,10 +2607,13 @@
   {
     "word": "rome",
     "phonetic": "rәum",
-    "chinese": "n. 罗马",
+    "chinese": "罗马（意大利城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -2995,11 +3050,14 @@
   {
     "word": "switzerland",
     "phonetic": "'switsәlәnd",
-    "chinese": "n. 瑞士",
+    "chinese": "瑞士（国家）",
     "tags": [
       "catalog",
+      "context",
       "ecdict",
-      "gk"
+      "gk",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -3068,10 +3126,13 @@
   {
     "word": "termini",
     "phonetic": "'tә:minai",
-    "chinese": "目的地, 界标",
+    "chinese": "罗马特米尼火车站",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -3416,19 +3477,25 @@
   {
     "word": "vatican",
     "phonetic": "'vætikәn",
-    "chinese": "n. 梵蒂冈, 罗马教廷",
+    "chinese": "梵蒂冈（梵蒂冈博物馆）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
     "word": "venice",
     "phonetic": "'venis",
-    "chinese": "n. 威尼斯",
+    "chinese": "威尼斯（意大利城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
@@ -3738,19 +3805,25 @@
   {
     "word": "zermatt",
     "phonetic": null,
-    "chinese": "n. 策马特（位于瑞士瓦莱斯州）",
+    "chinese": "采尔马特（瑞士城镇）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {
     "word": "zurich",
     "phonetic": "'zuәrik",
-    "chinese": "n. 苏黎士",
+    "chinese": "苏黎世（瑞士城市）",
     "tags": [
       "catalog",
-      "ecdict"
+      "context",
+      "ecdict",
+      "manual",
+      "proper-name"
     ]
   },
   {

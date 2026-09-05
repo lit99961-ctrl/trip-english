@@ -13,33 +13,41 @@ const OUTPUT_SIZE = 1000;
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outputPath = join(projectRoot, "src/content/dictionary.generated.json");
 
-// Audited catalog-only variants and proper names which are not guaranteed to be
-// headwords in ECDICT. If ECDICT supplies one, its pinned-source entry wins.
-const manualOverrides = new Map(Object.entries({
+// Audited proper names use their course-context meaning even when ECDICT has a
+// homonymous headword. ECDICT phonetics and source tags are retained when useful.
+const contextProperNameOverrides = new Map(Object.entries({
   "alex": "亚历克斯（人名）",
+  "bright": "Bright App（示例应用名）",
+  "florence": "佛罗伦萨（意大利城市）",
+  "gornergrat": "戈尔内格拉特（瑞士山地）",
+  "grindelwald": "格林德瓦（瑞士地名）",
+  "helsinki": "赫尔辛基（芬兰城市）",
+  "hong": "香港（Hong Kong 地名组成）",
+  "interlaken": "因特拉肯（瑞士城市）",
+  "italy": "意大利（国家）",
+  "kong": "香港（Hong Kong 地名组成）",
+  "leo": "利奥（人名）",
+  "leonardo": "莱昂纳多特快列车（机场列车）",
+  "li": "李（姓氏）",
+  "lucerne": "卢塞恩（瑞士城市）",
+  "lungern": "伦根（瑞士城镇）",
+  "mia": "米娅（人名）",
+  "milan": "米兰（意大利城市）",
+  "rialto": "里亚托（威尼斯地名/里亚托桥）",
+  "rome": "罗马（意大利城市）",
+  "switzerland": "瑞士（国家）",
+  "termini": "罗马特米尼火车站",
+  "vatican": "梵蒂冈（梵蒂冈博物馆）",
+  "venice": "威尼斯（意大利城市）",
+  "zermatt": "采尔马特（瑞士城镇）",
+  "zurich": "苏黎世（瑞士城市）"
+}));
+
+// Catalog variants without a usable pinned ECDICT translation fall back here.
+const manualFallbackOverrides = new Map(Object.entries({
   "can't": "不能；无法",
   "don't": "不；不要",
-  "florence": "佛罗伦萨",
-  "gornergrat": "戈尔内格拉特",
-  "grindelwald": "格林德瓦",
-  "helsinki": "赫尔辛基",
-  "interlaken": "因特拉肯",
-  "italy": "意大利",
-  "leo": "利奥（人名）",
-  "leonardo": "莱昂纳多（人名）",
-  "li": "李（姓氏）",
-  "lucerne": "卢塞恩",
-  "lungern": "伦根",
-  "mia": "米娅（人名）",
-  "rialto": "里亚托",
-  "rome": "罗马",
-  "switzerland": "瑞士",
-  "termini": "特米尼火车站",
-  "vatican": "梵蒂冈",
-  "vaporetto": "威尼斯水上巴士",
-  "venice": "威尼斯",
-  "zermatt": "采尔马特",
-  "zurich": "苏黎世"
+  "vaporetto": "威尼斯水上巴士"
 }));
 
 export function assertPinnedSourceUrl(url) {
@@ -153,8 +161,19 @@ function withoutRanks(entry) {
 
 export function selectEntries(catalogWords, catalogEntries, fillerEntries) {
   for (const word of [...catalogWords].sort()) {
-    if (!catalogEntries.has(word) && manualOverrides.has(word)) {
-      catalogEntries.set(word, { word, phonetic: null, chinese: manualOverrides.get(word), tags: ["catalog", "manual"], bnc: Number.POSITIVE_INFINITY, frq: Number.POSITIVE_INFINITY });
+    const contextualMeaning = contextProperNameOverrides.get(word);
+    if (contextualMeaning !== undefined) {
+      const source = catalogEntries.get(word);
+      catalogEntries.set(word, {
+        word,
+        phonetic: source?.phonetic ?? null,
+        chinese: contextualMeaning,
+        tags: [...new Set([...(source?.tags ?? ["catalog"]), "context", "manual", "proper-name"])].sort(),
+        bnc: source?.bnc ?? Number.POSITIVE_INFINITY,
+        frq: source?.frq ?? Number.POSITIVE_INFINITY
+      });
+    } else if (!catalogEntries.has(word) && manualFallbackOverrides.has(word)) {
+      catalogEntries.set(word, { word, phonetic: null, chinese: manualFallbackOverrides.get(word), tags: ["catalog", "manual", "variant"], bnc: Number.POSITIVE_INFINITY, frq: Number.POSITIVE_INFINITY });
     }
   }
   const missing = [...catalogWords].filter((word) => !catalogEntries.has(word)).sort();
