@@ -144,6 +144,7 @@ describe("IndexedDbProgressRepository", () => {
     const repository = createRepository();
     await repository.saveExerciseResult({ missionId: "hotel", exerciseId: "listen-1" });
     await repository.saveRecording("hotel/listen-1", new NodeBlob(["recording"]));
+    await repository.createRestoreCheckpoint();
 
     await repository.reset();
 
@@ -151,6 +152,7 @@ describe("IndexedDbProgressRepository", () => {
     expect(progress.activeMissionId).toBeNull();
     expect(progress.sessions).toEqual({});
     await expect(repository.loadRecording("hotel/listen-1")).resolves.toBeUndefined();
+    await expect(repository.rollbackRestoreCheckpoint()).rejects.toThrow("checkpoint");
 
     await repository.saveExerciseResult({ missionId: "taxi", exerciseId: "roleplay-1" });
     await expect(repository.load()).resolves.toMatchObject({ activeMissionId: "taxi" });

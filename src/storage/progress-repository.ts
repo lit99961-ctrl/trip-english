@@ -10,6 +10,10 @@ export interface ProgressRepository {
   saveExerciseResult(input: SaveExerciseResultInput): Promise<LearnerProgressV1>;
   saveRecording(key: string, recording: Blob): Promise<void>;
   loadRecording(key: string): Promise<Blob | undefined>;
+  createRestoreCheckpoint(): Promise<void>;
+  replaceProgress(progress: LearnerProgressV1): Promise<void>;
+  rollbackRestoreCheckpoint(): Promise<void>;
+  clearRestoreCheckpoint(): Promise<void>;
   reset(): Promise<void>;
   close(): void;
 }

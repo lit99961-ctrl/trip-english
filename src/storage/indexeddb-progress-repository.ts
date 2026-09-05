@@ -8,6 +8,7 @@ import type { ProgressRepository, SaveExerciseResultInput } from "./progress-rep
 
 const DATABASE_VERSION = 1;
 const PROGRESS_KEY = "learner-progress";
+const RESTORE_CHECKPOINT_KEY = "pre-restore-progress";
 
 interface ProgressDatabase extends DBSchema {
   progress: {
@@ -82,6 +83,48 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   public async loadRecording(key: string): Promise<Blob | undefined> {
     const database = await this.getDatabase();
     return database.get("recordings", key);
+  }
+
+  public async createRestoreCheckpoint(): Promise<void> {
+    const database = await this.getDatabase();
+    const transaction = database.transaction(["progress", "restore-checkpoints"], "readwrite");
+    const storedProgress = await transaction.objectStore("progress").get(PROGRESS_KEY);
+    const progress = migrateProgress(storedProgress, this.now());
+
+    if (storedProgress === undefined) {
+      await transaction.objectStore("progress").put(progress, PROGRESS_KEY);
+    }
+    await transaction.objectStore("restore-checkpoints").put(progress, RESTORE_CHECKPOINT_KEY);
+    await transaction.done;
+  }
+
+  public async replaceProgress(progress: LearnerProgressV1): Promise<void> {
+    const validatedProgress = migrateProgress(progress, this.now());
+    const database = await this.getDatabase();
+    const transaction = database.transaction("progress", "readwrite");
+    await transaction.store.put(validatedProgress, PROGRESS_KEY);
+    await transaction.done;
+  }
+
+  public async rollbackRestoreCheckpoint(): Promise<void> {
+    const database = await this.getDatabase();
+    const transaction = database.transaction(["progress", "restore-checkpoints"], "readwrite");
+    const checkpoint = await transaction.objectStore("restore-checkpoints").get(RESTORE_CHECKPOINT_KEY);
+
+    if (checkpoint === undefined) {
+      await transaction.done;
+      throw new Error("restore checkpoint is unavailable");
+    }
+
+    await transaction.objectStore("progress").put(migrateProgress(checkpoint, this.now()), PROGRESS_KEY);
+    await transaction.done;
+  }
+
+  public async clearRestoreCheckpoint(): Promise<void> {
+    const database = await this.getDatabase();
+    const transaction = database.transaction("restore-checkpoints", "readwrite");
+    await transaction.store.delete(RESTORE_CHECKPOINT_KEY);
+    await transaction.done;
   }
 
   public async reset(): Promise<void> {
