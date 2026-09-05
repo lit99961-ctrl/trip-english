@@ -53,6 +53,8 @@ describe("readSelectedEnglish", () => {
     const range = document.createRange(); range.selectNodeContents(document.querySelector("span")!);
     const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range); document.dispatchEvent(new Event("selectionchange"));
     const bar = document.querySelector<HTMLElement>("[data-selection-actions]")!;
+    expect(bar.getAttribute("role")).toBe("toolbar");
+    expect(bar.getAttribute("aria-label")).toBe("已选择英文操作");
     expect([...bar.querySelectorAll("button")].map((button) => button.textContent)).toEqual(["朗读", "慢速", "中文", "加入复习"]);
     for (const label of ["朗读", "慢速", "中文", "加入复习"]) bar.querySelector<HTMLButtonElement>(`button[aria-label='${label}']`)!.click();
     await Promise.resolve();
@@ -88,6 +90,26 @@ describe("readSelectedEnglish", () => {
     await Promise.resolve(); await Promise.resolve();
 
     expect(onError).toHaveBeenCalledWith(error);
+    controller.destroy();
+  });
+
+  it("reports asynchronous and synchronous lookup/save callback failures", async () => {
+    document.body.innerHTML = '<p data-english><span>delayed</span></p>';
+    const lookupError = new Error("lookup failed"); const saveError = new Error("save failed"); const onError = vi.fn();
+    const controller = new SelectionController({
+      speech: { speak: vi.fn() },
+      onLookup: async () => { throw lookupError; },
+      onSave: () => { throw saveError; },
+      onError
+    });
+    const range = document.createRange(); range.selectNodeContents(document.querySelector("span")!);
+    const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range); document.dispatchEvent(new Event("selectionchange"));
+    document.querySelector<HTMLButtonElement>("button[aria-label='中文']")!.click();
+    document.querySelector<HTMLButtonElement>("button[aria-label='加入复习']")!.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith(lookupError);
+    expect(onError).toHaveBeenCalledWith(saveError);
     controller.destroy();
   });
 });

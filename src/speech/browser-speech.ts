@@ -5,6 +5,7 @@ export type SpeechFailureCode =
   | "invalid-text"
   | "playback-failed"
   | "synthesis-failed"
+  | "cancelled"
   | "permission-denied"
   | "recording-failed"
   | "network"
@@ -31,6 +32,10 @@ interface Synthesis {
   cancel(): void;
   speak(utterance: Utterance): void;
 }
+interface ActiveUtterance {
+  cancel(): void;
+}
+const activeUtterances = new WeakMap<Synthesis, ActiveUtterance>();
 interface Utterance extends EventSource {
   lang: string;
   rate: number;
@@ -134,14 +139,20 @@ export class BrowserSpeech implements SpeechPort {
     const utterance = new UtteranceConstructor(trimmed);
     utterance.lang = "en-US";
     utterance.rate = rate;
+    const previous = activeUtterances.get(synthesis);
     return new Promise<void>((resolve, reject) => {
+      let active: ActiveUtterance;
       const finish = (error?: SpeechCapabilityError) => {
         utterance.removeEventListener("end", ended);
         utterance.removeEventListener("error", failed);
+        if (activeUtterances.get(synthesis) === active) activeUtterances.delete(synthesis);
         error ? reject(error) : resolve();
       };
       const ended = () => finish();
       const failed = () => finish(capabilityError("synthesis-failed", "Speech synthesis failed."));
+      active = { cancel: () => finish(capabilityError("cancelled", "Speech was replaced by a newer request.")) };
+      previous?.cancel();
+      activeUtterances.set(synthesis, active);
       utterance.addEventListener("end", ended);
       utterance.addEventListener("error", failed);
       try {
@@ -258,8 +269,9 @@ export class BrowserSpeech implements SpeechPort {
         clean();
         failure ? reject(failure) : resolve(value);
       };
-      const result = (event: { results?: ArrayLike<ArrayLike<{ transcript?: string; confidence?: number }>> }) => {
-        const alternative = event.results?.[0]?.[0];
+      const result = (event: { resultIndex?: number; results?: ArrayLike<ArrayLike<{ transcript?: string; confidence?: number }>> }) => {
+        const index = typeof event.resultIndex === "number" && Number.isInteger(event.resultIndex) && event.resultIndex >= 0 ? event.resultIndex : 0;
+        const alternative = event.results?.[index]?.[0];
         const transcript = alternative?.transcript?.trim() ?? "";
         if (!transcript) return finish(null);
         const confidence = alternative?.confidence;

@@ -10,7 +10,7 @@ class Events {
 }
 class FakeAudio extends Events { playbackRate = 1; async play() {} }
 class FakeUtterance extends Events { lang = ""; rate = 1; constructor(readonly text: string) { super(); } }
-class FakeSynthesis { utterance: FakeUtterance | null = null; cancelled = false; cancel() { this.cancelled = true; } speak(utterance: FakeUtterance) { this.utterance = utterance; } }
+class FakeSynthesis { utterance: FakeUtterance | null = null; utterances: FakeUtterance[] = []; cancelled = false; cancel() { this.cancelled = true; } speak(utterance: FakeUtterance) { this.utterance = utterance; this.utterances.push(utterance); } }
 class FakeTrack { stopped = false; stop() { this.stopped = true; } }
 class FakeRecorder extends Events { state = "inactive"; mimeType = "audio/webm"; start() { this.state = "recording"; } stop() { this.state = "inactive"; this.emit("stop"); } }
 class FakeRecognition extends Events { lang = ""; interimResults = true; maxAlternatives = 0; aborted = false; start() {} abort() { this.aborted = true; } }
@@ -64,6 +64,20 @@ describe("BrowserSpeech", () => {
     synthesis.utterance?.emit("error");
     await expect(failed).rejects.toMatchObject({ code: "synthesis-failed" });
     await expect(speech.speak(" ", 1)).rejects.toMatchObject({ code: "invalid-text" });
+  });
+
+  it("cancels and settles an earlier utterance across BrowserSpeech instances", async () => {
+    const synthesis = new FakeSynthesis();
+    const dependencies = { speechSynthesis: synthesis, SpeechSynthesisUtterance: FakeUtterance };
+    const first = new BrowserSpeech(dependencies).speak("first", 1);
+    const firstUtterance = synthesis.utterance!;
+    const second = new BrowserSpeech(dependencies).speak("second", 1);
+
+    await expect(first).rejects.toMatchObject({ code: "cancelled" });
+    expect(firstUtterance.listenerCount("end")).toBe(0);
+    expect(firstUtterance.listenerCount("error")).toBe(0);
+    synthesis.utterance?.emit("end");
+    await expect(second).resolves.toBeUndefined();
   });
 
   it("records chunks and cleans up every track with idempotent stop", async () => {
@@ -139,6 +153,15 @@ describe("BrowserSpeech", () => {
     const none = speech.recognize("en-US");
     recognition.emit("error", { error: "no-speech" });
     await expect(none).resolves.toBeNull();
+  });
+
+  it("uses resultIndex when recognition supplies a later result", async () => {
+    const recognition = new FakeRecognition();
+    const speech = new BrowserSpeech({ SpeechRecognition: class { constructor() { return recognition; } } as unknown as typeof FakeRecognition });
+    const result = speech.recognize("en-US");
+    recognition.emit("result", { resultIndex: 1, results: [[{ transcript: "old", confidence: 0.1 }], [{ transcript: "latest", confidence: 0.9 }]] });
+
+    await expect(result).resolves.toEqual({ transcript: "latest", confidence: 0.9 });
   });
 
   it.each([["not-allowed", "permission-denied"], ["network", "network"]] as const)("surfaces %s recognition errors", async (error, code) => {

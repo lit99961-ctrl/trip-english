@@ -9,8 +9,8 @@ export function readSelectedEnglish(selection: Selection | null = typeof window 
 export interface SelectionControllerOptions {
   document?: Document;
   speech: Pick<SpeechPort, "speak">;
-  onLookup(text: string): void;
-  onSave(text: string): void;
+  onLookup(text: string): void | Promise<void>;
+  onSave(text: string): void | Promise<void>;
   onError?: ((error: unknown) => void) | undefined;
 }
 
@@ -55,7 +55,7 @@ export class SelectionController {
     const bar = this.document.createElement("div");
     bar.dataset.selectionActions = "";
     bar.className = "selection-action-bar";
-    bar.setAttribute("role", "status");
+    bar.setAttribute("role", "toolbar");
     bar.setAttribute("aria-label", "已选择英文操作");
     const action = (label: string, callback: () => void) => {
       const button = this.document.createElement("button");
@@ -67,8 +67,8 @@ export class SelectionController {
     };
     action("朗读", () => { if (this.selectedText) this.play(this.selectedText, 1); });
     action("慢速", () => { if (this.selectedText) this.play(this.selectedText, 0.75); });
-    action("中文", () => { if (this.selectedText) this.options.onLookup(this.selectedText); });
-    action("加入复习", () => { if (this.selectedText) this.options.onSave(this.selectedText); });
+    action("中文", () => { if (this.selectedText) this.invoke(this.options.onLookup, this.selectedText); });
+    action("加入复习", () => { if (this.selectedText) this.invoke(this.options.onSave, this.selectedText); });
     this.document.body.append(bar);
     this.bar = bar;
   }
@@ -80,8 +80,18 @@ export class SelectionController {
   }
 
   private play(text: string, rate: 1 | 0.75): void {
-    void this.options.speech.speak(text, rate).catch((error: unknown) => {
-      try { this.options.onError?.(error); } catch { /* reporting must not leak another rejection */ }
-    });
+    this.invoke((value) => this.options.speech.speak(value, rate), text);
+  }
+
+  private invoke(callback: (text: string) => void | Promise<void>, text: string): void {
+    try {
+      void Promise.resolve(callback(text)).catch((error: unknown) => this.report(error));
+    } catch (error) {
+      this.report(error);
+    }
+  }
+
+  private report(error: unknown): void {
+    try { this.options.onError?.(error); } catch { /* reporting must not leak another rejection */ }
   }
 }
