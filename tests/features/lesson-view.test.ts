@@ -292,4 +292,46 @@ describe("speaking-first lesson", () => {
 
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:lesson");
   });
+
+  it("reuses the exact pending event and attempt when a save is retried", async () => {
+    const { speech, persistence } = fixture();
+    const saveExerciseResult = vi.fn()
+      .mockRejectedValueOnce(new Error("quota"))
+      .mockResolvedValueOnce(undefined);
+    persistence.saveExerciseResult = saveExerciseResult;
+    const createEventId = vi.fn(() => "event-stable");
+    const createAttemptId = vi.fn(() => "attempt-stable");
+    const view = renderLesson({
+      mission: hotel,
+      progress: createLearnerProgressV1(),
+      speech,
+      persistence,
+      createEventId,
+      createAttemptId
+    });
+    document.body.append(view);
+    await click(view);
+    view.querySelector<HTMLInputElement>('input[value="recalled"]')!.click();
+    await click(view);
+    expect(primary(view).textContent).toBe("重试保存");
+    view.querySelector<HTMLInputElement>('input[value="recalled"]')!.click();
+    await click(view);
+
+    expect(createEventId).toHaveBeenCalledOnce();
+    expect(createAttemptId).toHaveBeenCalledOnce();
+    expect(saveExerciseResult).toHaveBeenCalledTimes(2);
+    expect(saveExerciseResult).toHaveBeenNthCalledWith(
+      2,
+      saveExerciseResult.mock.calls[0]![0]
+    );
+    expect(saveExerciseResult).toHaveBeenLastCalledWith(expect.objectContaining({
+      eventId: "event-stable",
+      speakingSecondsDelta: 0,
+      lessonState: expect.objectContaining({
+        phraseAttempts: expect.objectContaining({
+          [hotel.productionPhrases[0]!.id]: [expect.objectContaining({ attemptId: "attempt-stable" })]
+        })
+      })
+    }));
+  });
 });

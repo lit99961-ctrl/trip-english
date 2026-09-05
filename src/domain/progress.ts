@@ -19,8 +19,12 @@ const sessionSchema = z.object({
   phraseClasses: z.record(
     z.string(),
     z.enum(["introduced", "practiced", "recalled", "mastered"])
-  ).optional()
-}).strict();
+  ).optional(),
+  exerciseEvents: z.record(z.string(), z.string()).optional()
+}).strict().refine(
+  (session) => new Set(session.completedExerciseIds).size === session.completedExerciseIds.length,
+  { message: "completedExerciseIds must be unique", path: ["completedExerciseIds"] }
+);
 
 const calibrationSchema = z.object({
   supportLevel: z.enum(["full", "english", "partial", "prompt-only"]),

@@ -6,6 +6,8 @@ export interface SaveExerciseResultInput {
   exerciseId: string;
   lessonState?: LessonState;
   speakingSeconds?: number;
+  eventId?: string;
+  speakingSecondsDelta?: number;
 }
 
 export interface SaveCalibrationResultInput {

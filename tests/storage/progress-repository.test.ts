@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { deleteDB } from "idb";
-import { migrateProgress } from "../../src/domain/progress";
+import { createLearnerProgressV1, migrateProgress } from "../../src/domain/progress";
 import { IndexedDbProgressRepository } from "../../src/storage/indexeddb-progress-repository";
 
 const databaseNames: string[] = [];
@@ -64,6 +64,16 @@ describe("LearnerProgressV1 migration", () => {
 
   test("rejects unknown future schema versions", () => {
     expect(() => migrateProgress({ schemaVersion: 2 })).toThrow();
+  });
+
+  test("rejects persisted sessions with duplicate completed exercise IDs", () => {
+    const progress = createLearnerProgressV1();
+    progress.sessions.hotel = {
+      missionId: "hotel",
+      completedExerciseIds: ["e1", "e1"]
+    };
+
+    expect(() => migrateProgress(progress)).toThrow("unique");
   });
 });
 
@@ -325,6 +335,163 @@ describe("IndexedDbProgressRepository", () => {
 
     const stored = await repository.load();
     expect(stored.sessions.hotel!.phraseClasses!.reservation).toBe("practiced");
+  });
+
+  test("adds speaking deltas from interleaved old views and applies retries exactly once", async () => {
+    const repository = createRepository();
+    const oldViewRepository = new IndexedDbProgressRepository(databaseNames[0]);
+    repositories.push(oldViewRepository);
+    const staleTotal = (await oldViewRepository.load()).speakingSeconds;
+
+    await repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      eventId: "event-a",
+      speakingSecondsDelta: 3,
+      speakingSeconds: staleTotal + 3,
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: {},
+        phraseClasses: {}
+      }
+    });
+    const secondEvent = {
+      missionId: "hotel",
+      exerciseId: "e2",
+      eventId: "event-b",
+      speakingSecondsDelta: 5,
+      speakingSeconds: staleTotal + 5,
+      lessonState: {
+        completedExerciseIds: ["e1", "e2"],
+        phraseAttempts: {},
+        phraseClasses: {}
+      }
+    };
+    await oldViewRepository.saveExerciseResult(secondEvent);
+    await oldViewRepository.saveExerciseResult(secondEvent);
+
+    const stored = await repository.load();
+    expect(stored.speakingSeconds).toBe(8);
+    expect(stored.sessions.hotel!.completedExerciseIds).toEqual(["e1", "e2"]);
+  });
+
+  test.each([-1, Number.POSITIVE_INFINITY, 3_601])(
+    "rejects an unsafe per-exercise speaking delta of %s",
+    async (speakingSecondsDelta) => {
+      const repository = createRepository();
+
+      await expect(repository.saveExerciseResult({
+        missionId: "hotel",
+        exerciseId: "e1",
+        eventId: "unsafe-delta",
+        speakingSecondsDelta,
+        lessonState: {
+          completedExerciseIds: ["e1"],
+          phraseAttempts: {},
+          phraseClasses: {}
+        }
+      })).rejects.toThrow("outside the allowed range");
+      expect((await repository.load()).sessions).toEqual({});
+    }
+  );
+
+  test("rejects an event-id collision when the normalized payload differs", async () => {
+    const repository = createRepository();
+    const first = {
+      missionId: "hotel",
+      exerciseId: "e1",
+      eventId: "same-event",
+      speakingSecondsDelta: 3,
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: {},
+        phraseClasses: {}
+      }
+    };
+    await repository.saveExerciseResult(first);
+
+    await expect(repository.saveExerciseResult({
+      ...first,
+      speakingSecondsDelta: 4
+    })).rejects.toThrow("collision");
+    expect((await repository.load()).speakingSeconds).toBe(3);
+  });
+
+  test("rejects an attempt-id collision when its normalized attempt differs", async () => {
+    const repository = createRepository();
+    const firstAttempt = {
+      attemptId: "same-attempt",
+      supportLevel: "full" as const,
+      passed: true,
+      answerRevealed: true,
+      activity: "production" as const
+    };
+    await repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      eventId: "event-one",
+      speakingSecondsDelta: 0,
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: { reservation: [firstAttempt] },
+        phraseClasses: { reservation: "practiced" }
+      }
+    });
+
+    await expect(repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e2",
+      eventId: "event-two",
+      speakingSecondsDelta: 0,
+      lessonState: {
+        completedExerciseIds: ["e1", "e2"],
+        phraseAttempts: {
+          reservation: [{ ...firstAttempt, passed: false }]
+        },
+        phraseClasses: { reservation: "introduced" }
+      }
+    })).rejects.toThrow("attempt id collision");
+
+    expect((await repository.load()).sessions.hotel!.completedExerciseIds).toEqual(["e1"]);
+  });
+
+  test("rejects duplicate completed exercise IDs in new events", async () => {
+    const repository = createRepository();
+    await repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      eventId: "event-e1",
+      speakingSecondsDelta: 0,
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: {},
+        phraseClasses: {}
+      }
+    });
+
+    await expect(repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      eventId: "duplicate-e1",
+      speakingSecondsDelta: 0,
+      lessonState: {
+        completedExerciseIds: ["e1", "e1"],
+        phraseAttempts: {},
+        phraseClasses: {}
+      }
+    })).rejects.toThrow("unique");
+    await expect(repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      eventId: "loop-to-e1",
+      speakingSecondsDelta: 0,
+      lessonState: {
+        completedExerciseIds: ["e1", "e2", "e1"],
+        phraseAttempts: {},
+        phraseClasses: {}
+      }
+    })).rejects.toThrow("unique");
+    expect((await repository.load()).sessions.hotel!.completedExerciseIds).toEqual(["e1"]);
   });
 
   test("reset clears progress and recordings while leaving the repository usable", async () => {

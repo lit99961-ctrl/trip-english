@@ -32,6 +32,21 @@ export interface LessonViewOptions {
   createObjectURL?: (recording: Blob) => string;
   revokeObjectURL?: (url: string) => void;
   createAttemptId?: () => string;
+  createEventId?: () => string;
+}
+
+let fallbackIdSequence = 0;
+
+function generatedId(label: string): string {
+  try {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const values = new Uint32Array(4);
+    crypto.getRandomValues(values);
+    return `${label}-${[...values].map((value) => value.toString(36)).join("-")}`;
+  } catch {
+    fallbackIdSequence += 1;
+    return `${label}-${Date.now().toString(36)}-${fallbackIdSequence.toString(36)}`;
+  }
 }
 
 const stageMap = "active-review comprehension supported-speaking prompt-free-role-play reading-close";
@@ -135,7 +150,8 @@ function defaultNavigation(root: HTMLElement): void {
 export function renderLesson(options: LessonViewOptions): LessonView {
   const { mission, progress, speech, persistence } = options;
   const now = options.now ?? Date.now;
-  const createAttemptId = options.createAttemptId ?? (() => crypto.randomUUID());
+  const createAttemptId = options.createAttemptId ?? (() => generatedId("attempt"));
+  const createEventId = options.createEventId ?? (() => generatedId("event"));
   const definition: LessonDefinition = {
     exerciseIds: mission.exercises.map((exercise) => exercise.id),
     phraseIds: mission.productionPhrases.map((phrase) => phrase.id)
@@ -149,6 +165,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
   nextExercise(definition, state);
 
   let speakingSeconds = progress.speakingSeconds;
+  let exerciseSpeakingSeconds = 0;
   let lastAttemptClass = latestAttemptClass(state);
   let saveError: string | undefined;
   let activeReviewRevealed = false;
@@ -162,6 +179,13 @@ export function renderLesson(options: LessonViewOptions): LessonView {
   let speechPhase: "idle" | "recording" | "assessed" | "self-rating" = "idle";
   let recognizedPass = false;
   let disposed = false;
+  let pendingCompletion: {
+    exerciseId: string;
+    completedState: LessonState;
+    candidateClass?: AttemptClass | undefined;
+    speakingSecondsDelta: number;
+    payload: SaveExerciseResultInput;
+  } | undefined;
 
   const root = document.createElement("section") as LessonView;
   root.className = "lesson-view";
@@ -179,21 +203,47 @@ export function renderLesson(options: LessonViewOptions): LessonView {
     candidateState: LessonState,
     candidateClass?: AttemptClass
   ): Promise<boolean> => {
-    const completedState = completeExercise(definition, candidateState, exerciseId);
-    try {
-      await persistence.saveExerciseResult({
-        missionId: mission.id,
+    if (!pendingCompletion) {
+      const speakingSecondsDelta = exerciseSpeakingSeconds;
+      const completedState = completeExercise(definition, candidateState, exerciseId);
+      pendingCompletion = {
         exerciseId,
-        lessonState: completedState,
-        speakingSeconds
-      });
+        completedState,
+        candidateClass,
+        speakingSecondsDelta,
+        payload: {
+          missionId: mission.id,
+          exerciseId,
+          eventId: createEventId(),
+          lessonState: completedState,
+          speakingSecondsDelta,
+          speakingSeconds: speakingSeconds + speakingSecondsDelta
+        }
+      };
+    }
+    if (pendingCompletion.exerciseId !== exerciseId) {
+      throw new Error("A different exercise completion is still pending");
+    }
+    const pending = pendingCompletion;
+    let savedProgress: unknown;
+    try {
+      savedProgress = await persistence.saveExerciseResult(pending.payload);
     } catch {
       saveError = "未能保存，本题还在这里。请检查存储空间后重试。";
       return false;
     }
     if (disposed) return false;
-    state = completedState;
-    lastAttemptClass = candidateClass ?? latestAttemptClass(completedState);
+    state = pending.completedState;
+    const savedSpeakingSeconds = savedProgress
+      && typeof savedProgress === "object"
+      && "speakingSeconds" in savedProgress
+      && typeof savedProgress.speakingSeconds === "number"
+      ? savedProgress.speakingSeconds
+      : undefined;
+    speakingSeconds = savedSpeakingSeconds ?? speakingSeconds + pending.speakingSecondsDelta;
+    exerciseSpeakingSeconds = 0;
+    lastAttemptClass = pending.candidateClass ?? latestAttemptClass(pending.completedState);
+    pendingCompletion = undefined;
     saveError = undefined;
     activeReviewRevealed = false;
     readingChecked = false;
@@ -292,6 +342,11 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         primary.textContent = "确认";
         primary.addEventListener("click", async () => {
           primary.disabled = true;
+          if (pendingCompletion) {
+            await persistCompletion(exercise.id, state);
+            render();
+            return;
+          }
           const selected = rating.querySelector<HTMLInputElement>('input[type="radio"]:checked');
           if (!selected) {
             primary.disabled = false;
@@ -330,6 +385,11 @@ export function renderLesson(options: LessonViewOptions): LessonView {
       primary.textContent = "继续";
       primary.addEventListener("click", async () => {
         primary.disabled = true;
+        if (pendingCompletion) {
+          await persistCompletion(exercise.id, state);
+          render();
+          return;
+        }
         const selected = choices.querySelector<HTMLInputElement>('input[type="radio"]:checked');
         if (!selected) {
           primary.disabled = false;
@@ -391,6 +451,11 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         primary.textContent = "完成阅读";
         primary.addEventListener("click", async () => {
           primary.disabled = true;
+          if (pendingCompletion) {
+            await persistCompletion(exercise.id, state);
+            render();
+            return;
+          }
           let candidateState = state;
           let candidateClass: AttemptClass | undefined;
           if (phrase) {
@@ -458,7 +523,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           const stoppedAt = now();
           try {
             recordingBlob = await recording!.stop();
-            speakingSeconds += Math.max(0, stoppedAt - recordingStartedAt) / 1_000;
+            exerciseSpeakingSeconds += Math.max(0, stoppedAt - recordingStartedAt) / 1_000;
           } catch {
             recordingBlob = undefined;
           }
@@ -508,6 +573,11 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         primary.textContent = "继续";
         primary.addEventListener("click", async () => {
           primary.disabled = true;
+          if (pendingCompletion) {
+            await persistCompletion(exercise.id, state);
+            render();
+            return;
+          }
           let passed = recognizedPass;
           if (rating) {
             const selected = rating.querySelector<HTMLInputElement>('input[type="radio"]:checked');
@@ -534,6 +604,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         });
       }
     }
+    if (pendingCompletion) primary.textContent = "重试保存";
     root.append(primary);
     queueMicrotask(() => heading.focus());
   };

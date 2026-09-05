@@ -22,6 +22,7 @@ import type {
 const DATABASE_VERSION = 1;
 const PROGRESS_KEY = "learner-progress";
 const RESTORE_CHECKPOINT_KEY = "pre-restore-progress";
+const MAX_EXERCISE_SPEAKING_SECONDS = 3_600;
 
 interface ProgressDatabase extends DBSchema {
   progress: {
@@ -75,6 +76,20 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     ) {
       throw new Error("speakingSeconds must be a non-negative finite number");
     }
+    const isEventWrite = input.eventId !== undefined || input.speakingSecondsDelta !== undefined;
+    if (isEventWrite && (!input.eventId || input.speakingSecondsDelta === undefined || !input.lessonState)) {
+      throw new Error("eventId, speakingSecondsDelta, and lessonState are required together");
+    }
+    if (
+      input.speakingSecondsDelta !== undefined
+      && (
+        !Number.isFinite(input.speakingSecondsDelta)
+        || input.speakingSecondsDelta < 0
+        || input.speakingSecondsDelta > MAX_EXERCISE_SPEAKING_SECONDS
+      )
+    ) {
+      throw new Error("speakingSecondsDelta is outside the allowed range");
+    }
     const database = await this.getDatabase();
     const transaction = database.transaction("progress", "readwrite");
     const storedProgress = await transaction.store.get(PROGRESS_KEY);
@@ -83,12 +98,35 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       missionId: input.missionId,
       completedExerciseIds: []
     };
+    const normalizedEventPayload = isEventWrite
+      ? stableJson({
+        exerciseId: input.exerciseId,
+        completedExerciseIds: input.lessonState!.completedExerciseIds,
+        phraseAttempts: input.lessonState!.phraseAttempts,
+        speakingSecondsDelta: input.speakingSecondsDelta
+      })
+      : undefined;
+    const storedEventPayload = input.eventId
+      ? session.exerciseEvents?.[input.eventId]
+      : undefined;
+    if (storedEventPayload !== undefined) {
+      if (storedEventPayload !== normalizedEventPayload) {
+        throw new Error(`exercise event id collision: ${input.eventId}`);
+      }
+      await transaction.done;
+      return progress;
+    }
     const incomingCompletedIds = input.lessonState?.completedExerciseIds
       ?? (session.completedExerciseIds.includes(input.exerciseId)
         ? session.completedExerciseIds
         : [...session.completedExerciseIds, input.exerciseId]);
     const completedExerciseIds = input.lessonState
-      ? mergeCompletionEvent(session.completedExerciseIds, incomingCompletedIds, input.exerciseId)
+      ? mergeCompletionEvent(
+        session.completedExerciseIds,
+        incomingCompletedIds,
+        input.exerciseId,
+        isEventWrite
+      )
       : [...incomingCompletedIds];
     if (!completedExerciseIds.includes(input.exerciseId)) {
       throw new Error("lessonState must include the completed exercise");
@@ -99,9 +137,11 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     const nextProgress: LearnerProgressV1 = {
       ...progress,
       activeMissionId: input.missionId,
-      speakingSeconds: input.speakingSeconds === undefined
-        ? progress.speakingSeconds
-        : Math.max(progress.speakingSeconds, input.speakingSeconds),
+      speakingSeconds: isEventWrite
+        ? progress.speakingSeconds + input.speakingSecondsDelta!
+        : input.speakingSeconds === undefined
+          ? progress.speakingSeconds
+          : Math.max(progress.speakingSeconds, input.speakingSeconds),
       sessions: {
         ...progress.sessions,
         [input.missionId]: {
@@ -110,6 +150,12 @@ export class IndexedDbProgressRepository implements ProgressRepository {
           ...(phraseAttempts === undefined ? {} : {
             phraseAttempts,
             phraseClasses: derivePhraseClasses(phraseAttempts)
+          }),
+          ...(input.eventId === undefined ? {} : {
+            exerciseEvents: {
+              ...(session.exerciseEvents ?? {}),
+              [input.eventId]: normalizedEventPayload!
+            }
           })
         }
       }
@@ -289,14 +335,20 @@ function isPrefix(prefix: readonly string[], candidate: readonly string[]): bool
 function mergeCompletionEvent(
   current: readonly string[],
   incoming: readonly string[],
-  exerciseId: string
+  exerciseId: string,
+  rejectExistingExercise: boolean
 ): string[] {
+  if (new Set(current).size !== current.length || new Set(incoming).size !== incoming.length) {
+    throw new Error("completedExerciseIds must be unique");
+  }
   if (incoming.at(-1) !== exerciseId) {
     throw new Error("lessonState must end with its completion event");
   }
   const previous = incoming.slice(0, -1);
   if (previous.length === current.length && isPrefix(previous, current)) return [...incoming];
-  if (isPrefix(previous, current) && current[previous.length] === exerciseId) return [...current];
+  if (!rejectExistingExercise && isPrefix(previous, current) && current[previous.length] === exerciseId) {
+    return [...current];
+  }
   throw new Error("completion event does not follow stored authored order");
 }
 
@@ -310,17 +362,31 @@ function mergeAttemptRecords(
 ): Record<string, Attempt[]> {
   const merged: Record<string, Attempt[]> = {};
   const phraseIds = new Set([...Object.keys(current ?? {}), ...Object.keys(incoming)]);
+  const attemptsById = new Map<string, { phraseId: string; attempt: Attempt }>();
+  for (const [phraseId, history] of Object.entries(current ?? {})) {
+    for (const attempt of history) {
+      if (!attempt.attemptId) continue;
+      const existing = attemptsById.get(attempt.attemptId);
+      if (existing && (existing.phraseId !== phraseId || !attemptsEqual(existing.attempt, attempt))) {
+        throw new Error(`stored attempt id collision: ${attempt.attemptId}`);
+      }
+      attemptsById.set(attempt.attemptId, { phraseId, attempt });
+    }
+  }
 
   for (const phraseId of phraseIds) {
     const currentHistory = [...(current?.[phraseId] ?? [])];
     const result = [...currentHistory];
-    const seenAttemptIds = new Set(
-      currentHistory.flatMap((attempt) => attempt.attemptId ? [attempt.attemptId] : [])
-    );
     for (const [index, attempt] of (incoming[phraseId] ?? []).entries()) {
       if (attempt.attemptId) {
-        if (seenAttemptIds.has(attempt.attemptId)) continue;
-        seenAttemptIds.add(attempt.attemptId);
+        const existing = attemptsById.get(attempt.attemptId);
+        if (existing) {
+          if (existing.phraseId !== phraseId || !attemptsEqual(existing.attempt, attempt)) {
+            throw new Error(`attempt id collision: ${attempt.attemptId}`);
+          }
+          continue;
+        }
+        attemptsById.set(attempt.attemptId, { phraseId, attempt });
         result.push(attempt);
       } else if (!currentHistory[index] || !attemptsEqual(currentHistory[index], attempt)) {
         result.push(attempt);
