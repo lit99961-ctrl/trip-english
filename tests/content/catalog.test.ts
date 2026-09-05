@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { allMissions, assertUnique, catalog, validateCatalog } from "../../src/content/catalog";
+import { deepFreeze } from "../../src/content/content-validation";
 
 function candidateMission(overrides: Record<string, unknown> = {}) {
   return {
@@ -27,6 +28,21 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
 }
 
 describe("course catalog", () => {
+  it("freezes mutable descendants even when their parent is already frozen", () => {
+    const child = { value: "mutable" };
+    const parent = Object.freeze({ child });
+
+    deepFreeze(parent);
+
+    expect(Object.isFrozen(child)).toBe(true);
+  });
+
+  it("rejects unsupported built-in collection and date objects", () => {
+    expect(() => deepFreeze(new Date())).toThrow("plain records and arrays");
+    expect(() => deepFreeze(new Map())).toThrow("plain records and arrays");
+    expect(() => deepFreeze(new Set())).toThrow("plain records and arrays");
+  });
+
   it("accepts the full catalog and an explicit valid catalog", () => {
     expect(validateCatalog()).toEqual(allMissions);
     expect(catalog).toHaveLength(12);

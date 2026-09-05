@@ -50,15 +50,15 @@ describe("itinerary course coverage", () => {
   });
 
   it("accepts short useful responses and authored alternatives", () => {
-    expect(passesPhrase("hk-checkin-check-in", "check in")).toBe(true);
+    expect(passesPhrase("hk-checkin-check-in", "want check in")).toBe(true);
     expect(passesPhrase("hk-checkin-seat", "window seat")).toBe(true);
     expect(passesPhrase("hk-checkin-repeat", "repeat slowly")).toBe(true);
     expect(passesPhrase("helsinki-transfer-show", "show screen")).toBe(true);
     expect(passesPhrase("urgent-help-phone", "phone charge")).toBe(true);
-    expect(passesPhrase("email-action-travel", "Italy Switzerland")).toBe(true);
+    expect(passesPhrase("email-action-travel", "travel Italy Switzerland")).toBe(true);
     expect(passesPhrase("restaurant-table", "table two")).toBe(true);
     expect(passesPhrase("restaurant-bill", "bill")).toBe(true);
-    expect(passesPhrase("rome-arrival-baggage", "baggage claim")).toBe(true);
+    expect(passesPhrase("rome-arrival-baggage", "find baggage claim")).toBe(true);
   });
 
   it("binds every role-play variation to its prompt template", () => {
@@ -90,6 +90,31 @@ describe("itinerary course coverage", () => {
 
     expect(targets).toHaveLength(30);
     expect(new Set(targets.map((phrase) => phrase.id)).size).toBe(30);
+  });
+
+  it("requires every active target to express more than one semantic component", () => {
+    const targets = allMissions
+      .flatMap((mission) => mission.productionPhrases)
+      .filter((phrase) => phrase.activeTarget);
+
+    for (const phrase of targets) {
+      expect(phrase.requiredKeywordGroups.length, phrase.id).toBeGreaterThanOrEqual(2);
+      const incompleteFragment = phrase.requiredKeywordGroups[0]![0]!;
+      expect(
+        scoreTranscript(incompleteFragment, { requiredKeywords: phrase.requiredKeywordGroups }).passed,
+        `${phrase.id}: ${incompleteFragment}`
+      ).toBe(false);
+      expect(
+        scoreTranscript(phrase.english, { requiredKeywords: phrase.requiredKeywordGroups }).passed,
+        phrase.id
+      ).toBe(true);
+    }
+  });
+
+  it("rejects representative bare travel objects", () => {
+    expect(passesPhrase("hk-checkin-gate", "gate")).toBe(false);
+    expect(passesPhrase("italy-high-speed-rail-platform", "platform")).toBe(false);
+    expect(passesPhrase("shopping-tax-refund-size", "medium")).toBe(false);
   });
 
   it("keeps business active targets to the two personal introduction facts", () => {
@@ -206,6 +231,31 @@ describe("itinerary course coverage", () => {
     expect(message).toMatch(/cannot|can't/i);
     expect(message).toMatch(/schedule|meeting/i);
     expect(message).toMatch(/next step/i);
+  });
+
+  it("uses semantic business reading IDs without unrelated phrase links", () => {
+    const readingIds = businessMissions.flatMap((mission) =>
+      mission.exercises.filter((exercise) => exercise.type === "reading").map((exercise) => exercise.id)
+    );
+
+    expect(readingIds).toEqual([
+      "email-action-reading-sender", "email-action-reading-recipient", "email-action-reading-action", "email-action-reading-deadline", "email-action-reading-subject",
+      "internet-headline-reading-company", "internet-headline-reading-product", "internet-headline-reading-addition", "internet-headline-reading-change-type", "internet-headline-reading-date",
+      "message-intent-reading-request", "message-intent-reading-confirmer", "message-intent-reading-unavailable-person", "message-intent-reading-new-time", "message-intent-reading-next-step"
+    ]);
+    expect(businessMissions.flatMap((mission) => mission.exercises)
+      .filter((exercise) => exercise.type === "reading")
+      .every((exercise) => exercise.phraseId === undefined)).toBe(true);
+  });
+
+  it("links varied role-plays to phrases that match the rendered situation", () => {
+    const roleplayFor = (missionId: string) => travelMissions.find((mission) => mission.id === missionId)!
+      .exercises.find((exercise) => exercise.type === "roleplay")!;
+
+    expect(roleplayFor("swiss-mountain-transit").phraseId).toBe("swiss-mountain-transit-return");
+    expect(roleplayFor("urgent-help").phraseId).toBe("urgent-help-police");
+    expect(renderRoleplayPrompt(roleplayFor("urgent-help").promptTemplate, roleplayFor("urgent-help").variation))
+      .toContain("at the station entrance");
   });
 
   it("makes reading questions assessable and links personal active cards to practice", () => {
