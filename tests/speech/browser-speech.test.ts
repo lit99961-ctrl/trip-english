@@ -15,6 +15,7 @@ class FakeTrack { stopped = false; stop() { this.stopped = true; } }
 class FakeRecorder extends Events { state = "inactive"; mimeType = "audio/webm"; start() { this.state = "recording"; } stop() { this.state = "inactive"; this.emit("stop"); } }
 class FakeRecognition extends Events { lang = ""; interimResults = true; maxAlternatives = 0; aborted = false; start() {} abort() { this.aborted = true; } }
 class SyncErrorRecorder extends FakeRecorder { override start() { this.state = "recording"; this.emit("error"); } }
+class EndedOnStartRecorder extends FakeRecorder { override start() { this.state = "recording"; this.emit("dataavailable", { data: new Blob(["ended"]) }); this.state = "inactive"; this.emit("stop"); } }
 class TimeoutRaceRecognition extends FakeRecognition { override abort() { this.aborted = true; this.emit("error", { error: "network" }); this.emit("end"); } }
 class AbortThrowingRecognition extends FakeRecognition { stopped = false; override abort() { throw new Error("abort failed"); } stop() { this.stopped = true; } }
 
@@ -97,6 +98,21 @@ describe("BrowserSpeech", () => {
     recorder.emit("error");
 
     await expect(session.stop()).rejects.toMatchObject({ code: "recording-failed" });
+    expect(track.stopped).toBe(true);
+  });
+
+  it("returns the stored blob when recording ends before the caller stops it", async () => {
+    const track = new FakeTrack();
+    const recorder = new EndedOnStartRecorder();
+    const speech = new BrowserSpeech({
+      getUserMedia: async () => ({ getTracks: () => [track] }) as unknown as MediaStream,
+      MediaRecorder: class { constructor() { return recorder; } } as unknown as typeof MediaRecorder
+    });
+    const session = await speech.startRecording();
+    const first = session.stop(); const second = session.stop();
+
+    expect(second).toBe(first);
+    await expect(first).resolves.toMatchObject({ type: "audio/webm", size: 5 });
     expect(track.stopped).toBe(true);
   });
 

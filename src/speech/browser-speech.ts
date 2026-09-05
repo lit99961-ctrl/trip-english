@@ -171,9 +171,16 @@ export class BrowserSpeech implements SpeechPort {
       throw capabilityError("recording-failed", "Could not create a recorder.");
     }
     const chunks: BlobPart[] = [];
-    let stopped: Promise<Blob> | undefined;
     let settled = false;
+    let stopRequested = false;
     let terminalError: SpeechCapabilityError | null = null;
+    let resolveOutcome: (blob: Blob) => void = () => undefined;
+    let rejectOutcome: (error: SpeechCapabilityError) => void = () => undefined;
+    const outcome = new Promise<Blob>((resolve, reject) => {
+      resolveOutcome = resolve;
+      rejectOutcome = reject;
+    });
+    void outcome.catch(() => undefined);
     const stopTracks = () => stream.getTracks().forEach((track) => track.stop());
     const cleanup = () => {
       recorder.removeEventListener("dataavailable", data);
@@ -183,14 +190,12 @@ export class BrowserSpeech implements SpeechPort {
     const data = (event: { data?: Blob }) => {
       if (event.data && event.data.size > 0) chunks.push(event.data);
     };
-    let resolveStop: (blob: Blob) => void = () => undefined;
-    let rejectStop: (error: SpeechCapabilityError) => void = () => undefined;
     const complete = () => {
       if (settled) return;
       settled = true;
       cleanup();
       stopTracks();
-      resolveStop(new Blob(chunks, recorder.mimeType ? { type: recorder.mimeType } : undefined));
+      resolveOutcome(new Blob(chunks, recorder.mimeType ? { type: recorder.mimeType } : undefined));
     };
     const failure = () => {
       if (settled) return;
@@ -198,7 +203,7 @@ export class BrowserSpeech implements SpeechPort {
       cleanup();
       stopTracks();
       terminalError = capabilityError("recording-failed", "Recording failed.");
-      rejectStop(terminalError);
+      rejectOutcome(terminalError);
     };
     recorder.addEventListener("dataavailable", data);
     recorder.addEventListener("stop", complete);
@@ -211,17 +216,14 @@ export class BrowserSpeech implements SpeechPort {
     if (terminalError) throw terminalError;
     return {
       stop: () => {
-        if (stopped) return stopped;
-        if (terminalError) return Promise.reject(terminalError);
-        stopped = new Promise<Blob>((resolve, reject) => {
-          resolveStop = resolve;
-          rejectStop = reject;
+        if (!settled && !stopRequested) {
+          stopRequested = true;
           if (recorder.state === "inactive") complete();
           else {
             try { recorder.stop(); } catch { failure(); }
           }
-        });
-        return stopped;
+        }
+        return outcome;
       }
     };
   }
