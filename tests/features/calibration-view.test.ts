@@ -215,6 +215,25 @@ describe("two-minute calibration", () => {
     expect(saveRecording.mock.calls[1]![1]).toBe(firstCall[1]);
     expect(view.textContent).toContain("说顺了");
   });
+
+  it("reports listening playback rejection without an unhandled promise", async () => {
+    const speech = speechFixture();
+    speech.speak = vi.fn(async () => { throw new Error("unavailable"); });
+    const view = renderCalibration({
+      speech,
+      store: { saveCalibrationResult: vi.fn(), saveRecording: vi.fn() }
+    });
+    document.body.append(view);
+    await clickPrimary(view);
+    chooseFirst(view);
+    await clickPrimary(view);
+    chooseFirst(view);
+    await clickPrimary(view);
+
+    view.querySelector<HTMLButtonElement>("button.secondary-action")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(view.querySelector('[role="alert"]')?.textContent).toContain("播放失败");
+  });
 });
 
 function primaryButton(view: HTMLElement): HTMLButtonElement {

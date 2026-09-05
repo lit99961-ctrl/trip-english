@@ -104,6 +104,31 @@ export function renderCalibration(options: CalibrationOptions): CalibrationView 
   let recordingSaveError: string | undefined;
   let speakingPhase: "idle" | "recording" | "save-error" | "rating" = "idle";
 
+  const playWithFeedback = (play: () => Promise<void>): void => {
+    let status = root.querySelector<HTMLElement>("[data-playback-status]");
+    if (!status) {
+      status = document.createElement("p");
+      status.dataset.playbackStatus = "true";
+      root.append(status);
+    }
+    status.setAttribute("role", "status");
+    status.textContent = "正在播放…";
+    try {
+      void play().then(() => {
+        if (disposed) return;
+        status!.setAttribute("role", "status");
+        status!.textContent = "播放完成。";
+      }).catch(() => {
+        if (disposed) return;
+        status!.setAttribute("role", "alert");
+        status!.textContent = "播放失败，请稍后重试。";
+      });
+    } catch {
+      status.setAttribute("role", "alert");
+      status.textContent = "播放失败，请稍后重试。";
+    }
+  };
+
   const appendRecordingPlayback = (message: string): void => {
     const help = document.createElement("p");
     help.textContent = message;
@@ -173,7 +198,7 @@ export function renderCalibration(options: CalibrationOptions): CalibrationView 
           listen.className = "secondary-action";
           listen.textContent = "播放英文";
           listen.setAttribute("aria-label", "播放题目英文");
-          listen.addEventListener("click", () => { void options.speech.speak(item.phrase!, 1); });
+          listen.addEventListener("click", () => playWithFeedback(() => options.speech.speak(item.phrase!, 1)));
           root.append(listen);
         }
         root.append(choiceField(item.choices, `calibration-${index}`));

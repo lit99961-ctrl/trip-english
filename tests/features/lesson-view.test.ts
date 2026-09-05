@@ -48,6 +48,60 @@ describe("speaking-first lesson", () => {
     expect(view.querySelectorAll("button.primary-action")).toHaveLength(1);
   });
 
+  it("uses calibration support to change hints without leaking prompt-free answers", () => {
+    const { speech, persistence } = fixture();
+    const fullProgress = createLearnerProgressV1();
+    const partialProgress = createLearnerProgressV1();
+    const completedExerciseIds = hotel.exercises.slice(0, 2).map((item) => item.id);
+    fullProgress.calibration = {
+      supportLevel: "full", correctItems: 1, speakingSeconds: 2,
+      completedAt: "2026-09-05T00:00:00.000Z", recordingKeys: []
+    };
+    partialProgress.calibration = {
+      supportLevel: "partial", correctItems: 4, speakingSeconds: 2,
+      completedAt: "2026-09-05T00:00:00.000Z", recordingKeys: []
+    };
+    fullProgress.sessions[hotel.id] = { missionId: hotel.id, completedExerciseIds };
+    partialProgress.sessions[hotel.id] = { missionId: hotel.id, completedExerciseIds };
+
+    const fullView = renderLesson({ mission: hotel, progress: fullProgress, speech, persistence });
+    const partialView = renderLesson({ mission: hotel, progress: partialProgress, speech, persistence });
+    const phrase = hotel.productionPhrases.find(
+      (item) => item.id === hotel.exercises[2]!.phraseId
+    )!;
+    expect(fullView.textContent).toContain(phrase.english);
+    expect(fullView.textContent).toContain(phrase.chinese);
+    expect(partialView.textContent).not.toContain(phrase.english);
+    expect(partialView.textContent).toContain(phrase.keywords[0]);
+
+    const roleplayIndex = hotel.exercises.findIndex((exercise) => exercise.type === "roleplay");
+    fullProgress.sessions[hotel.id]!.completedExerciseIds = hotel.exercises
+      .slice(0, roleplayIndex).map((item) => item.id);
+    const promptFree = renderLesson({ mission: hotel, progress: fullProgress, speech, persistence });
+    const roleplayPhrase = hotel.productionPhrases.find(
+      (item) => item.id === hotel.exercises[roleplayIndex]!.phraseId
+    )!;
+    expect(promptFree.textContent).not.toContain(roleplayPhrase.english);
+  });
+
+  it("derives the same calibrated hints after resume", () => {
+    const { speech, persistence } = fixture();
+    const progress = createLearnerProgressV1();
+    progress.calibration = {
+      supportLevel: "partial", correctItems: 4, speakingSeconds: 2,
+      completedAt: "2026-09-05T00:00:00.000Z", recordingKeys: []
+    };
+    progress.sessions[hotel.id] = {
+      missionId: hotel.id,
+      completedExerciseIds: hotel.exercises.slice(0, 2).map((item) => item.id)
+    };
+
+    const first = renderLesson({ mission: hotel, progress, speech, persistence });
+    const resumed = renderLesson({ mission: hotel, progress: structuredClone(progress), speech, persistence });
+    expect(resumed.textContent).toBe(first.textContent);
+    expect(resumed.dataset.stage).toBe(first.dataset.stage);
+  });
+
   it("saves after active self-review but never calls it mastered", async () => {
     const { speech, persistence } = fixture();
     const view = renderLesson({ mission: hotel, progress: createLearnerProgressV1(), speech, persistence });
@@ -306,6 +360,7 @@ describe("speaking-first lesson", () => {
       progress: createLearnerProgressV1(),
       speech,
       persistence,
+      now: () => Date.parse("2026-09-05T10:00:00.000Z"),
       createEventId,
       createAttemptId
     });
@@ -327,11 +382,36 @@ describe("speaking-first lesson", () => {
     expect(saveExerciseResult).toHaveBeenLastCalledWith(expect.objectContaining({
       eventId: "event-stable",
       speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "attempt-stable",
+        phraseId: hotel.productionPhrases[0]!.id,
+        missionId: hotel.id,
+        hintUsed: true,
+        occurredAt: "2026-09-05T10:00:00.000Z"
+      },
       lessonState: expect.objectContaining({
         phraseAttempts: expect.objectContaining({
           [hotel.productionPhrases[0]!.id]: [expect.objectContaining({ attemptId: "attempt-stable" })]
         })
       })
     }));
+  });
+
+  it("reports model-audio playback rejection without an unhandled promise", async () => {
+    const { speech, persistence } = fixture();
+    speech.playFixed = vi.fn(async () => { throw new Error("decode"); });
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = {
+      missionId: hotel.id,
+      completedExerciseIds: [hotel.exercises[0]!.id]
+    };
+    const view = renderLesson({ mission: hotel, progress, speech, persistence });
+    document.body.append(view);
+
+    view.querySelector<HTMLButtonElement>("button.secondary-action")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(view.querySelector('[role="alert"]')?.textContent).toContain("播放失败");
+    expect(view.querySelectorAll("button.primary-action")).toHaveLength(1);
   });
 });

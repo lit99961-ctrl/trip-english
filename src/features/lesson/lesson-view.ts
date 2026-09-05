@@ -73,10 +73,21 @@ function stageFor(type: Mission["exercises"][number]["type"], index: number): St
   return "supported-speaking";
 }
 
-function supportFor(type: Mission["exercises"][number]["type"]): SupportLevel {
+function supportFor(
+  type: Mission["exercises"][number]["type"],
+  baseline: SupportLevel
+): SupportLevel {
   if (type === "roleplay") return "prompt-only";
-  if (type === "recall") return "partial";
-  return "english";
+  if (type === "recall") {
+    return baseline === "full" || baseline === "english" ? "partial" : "prompt-only";
+  }
+  return baseline === "prompt-only" ? "partial" : baseline;
+}
+
+function hintCountFor(support: SupportLevel): number {
+  if (support === "prompt-only") return 0;
+  if (support === "full") return 2;
+  return 1;
 }
 
 function choiceField(
@@ -152,6 +163,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
   const now = options.now ?? Date.now;
   const createAttemptId = options.createAttemptId ?? (() => generatedId("attempt"));
   const createEventId = options.createEventId ?? (() => generatedId("event"));
+  const baselineSupport = progress.calibration?.supportLevel ?? "full";
   const definition: LessonDefinition = {
     exerciseIds: mission.exercises.map((exercise) => exercise.id),
     phraseIds: mission.productionPhrases.map((phrase) => phrase.id)
@@ -192,6 +204,31 @@ export function renderLesson(options: LessonViewOptions): LessonView {
   root.dataset.stageMap = stageMap;
   root.setAttribute("aria-live", "polite");
 
+  const playWithFeedback = (play: () => Promise<void>): void => {
+    let status = root.querySelector<HTMLElement>("[data-playback-status]");
+    if (!status) {
+      status = document.createElement("p");
+      status.dataset.playbackStatus = "true";
+      root.append(status);
+    }
+    status.setAttribute("role", "status");
+    status.textContent = "正在播放…";
+    try {
+      void play().then(() => {
+        if (disposed) return;
+        status!.setAttribute("role", "status");
+        status!.textContent = "播放完成。";
+      }).catch(() => {
+        if (disposed) return;
+        status!.setAttribute("role", "alert");
+        status!.textContent = "播放失败，请稍后重试。";
+      });
+    } catch {
+      status.setAttribute("role", "alert");
+      status.textContent = "播放失败，请稍后重试。";
+    }
+  };
+
   const releaseRecordingUrl = (): void => {
     if (!recordingUrl) return;
     (options.revokeObjectURL ?? URL.revokeObjectURL)?.(recordingUrl);
@@ -206,6 +243,12 @@ export function renderLesson(options: LessonViewOptions): LessonView {
     if (!pendingCompletion) {
       const speakingSecondsDelta = exerciseSpeakingSeconds;
       const completedState = completeExercise(definition, candidateState, exerciseId);
+      const previousAttemptIds = new Set(Object.values(state.phraseAttempts)
+        .flat().map((attempt) => attempt.attemptId).filter((id): id is string => id !== undefined));
+      const newAttempt = Object.entries(completedState.phraseAttempts)
+        .flatMap(([phraseId, history]) => history.map((attempt) => ({ phraseId, attempt })))
+        .find(({ attempt }) => attempt.attemptId !== undefined && !previousAttemptIds.has(attempt.attemptId));
+      const exercise = mission.exercises.find((item) => item.id === exerciseId);
       pendingCompletion = {
         exerciseId,
         completedState,
@@ -217,7 +260,17 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           eventId: createEventId(),
           lessonState: completedState,
           speakingSecondsDelta,
-          speakingSeconds: speakingSeconds + speakingSecondsDelta
+          speakingSeconds: speakingSeconds + speakingSecondsDelta,
+          ...(newAttempt?.attempt.attemptId && newAttempt.attempt.timestamp ? {
+            attemptEvent: {
+              attemptId: newAttempt.attempt.attemptId,
+              phraseId: newAttempt.phraseId,
+              missionId: mission.id,
+              ...(exercise?.type === "roleplay" ? { scenarioId: exercise.id } : {}),
+              hintUsed: (newAttempt.attempt.hintCount ?? 0) > 0,
+              occurredAt: newAttempt.attempt.timestamp
+            }
+          } : {})
         }
       };
     }
@@ -331,7 +384,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           listen.type = "button";
           listen.className = "secondary-action";
           listen.textContent = "播放答案";
-          listen.addEventListener("click", () => { void speech.playFixed(phrase.audio!, 1); });
+          listen.addEventListener("click", () => playWithFeedback(() => speech.playFixed(phrase.audio!, 1)));
           root.append(answer, listen);
         }
         const rating = choiceField([
@@ -360,6 +413,8 @@ export function renderLesson(options: LessonViewOptions): LessonView {
               passed: selected.value === "recalled",
               answerRevealed: true,
               supportLevel: "full",
+              hintCount: 2,
+              timestamp: new Date(now()).toISOString(),
               activity: "production"
             });
             candidateClass = candidateState.phraseClasses[phrase.id];
@@ -374,7 +429,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         listen.type = "button";
         listen.className = "secondary-action";
         listen.textContent = "播放英文";
-        listen.addEventListener("click", () => { void speech.playFixed(phrase.audio!, 1); });
+        listen.addEventListener("click", () => playWithFeedback(() => speech.playFixed(phrase.audio!, 1)));
         root.append(listen);
       }
       const choices = choiceField([
@@ -403,6 +458,8 @@ export function renderLesson(options: LessonViewOptions): LessonView {
             passed: selected.value === "answer",
             answerRevealed: true,
             supportLevel: "full",
+            hintCount: 1,
+            timestamp: new Date(now()).toISOString(),
             activity: "choice"
           });
           candidateClass = candidateState.phraseClasses[phrase.id];
@@ -464,6 +521,8 @@ export function renderLesson(options: LessonViewOptions): LessonView {
               passed: readingPassed,
               answerRevealed: !readingPassed,
               supportLevel: "english",
+              hintCount: readingPassed ? 0 : 1,
+              timestamp: new Date(now()).toISOString(),
               activity: "choice"
             });
             candidateClass = candidateState.phraseClasses[phrase.id];
@@ -473,7 +532,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         });
       }
     } else {
-      const support = supportFor(exercise.type);
+      const support = supportFor(exercise.type, baselineSupport);
       if (stage === "prompt-free-role-play") {
         const cue = document.createElement("p");
         const variation = exercise.type === "roleplay"
@@ -484,14 +543,20 @@ export function renderLesson(options: LessonViewOptions): LessonView {
       } else if (phrase) {
         const english = document.createElement("p");
         english.lang = "en";
-        english.textContent = support === "partial" ? phrase.keywords.join(" · ") : phrase.english;
+        english.textContent = support === "partial"
+          ? phrase.keywords.join(" · ")
+          : support === "prompt-only" ? "先按情境自己组织一句话。" : phrase.english;
+        const chinese = document.createElement("p");
+        chinese.textContent = phrase.chinese;
         const listen = document.createElement("button");
         listen.type = "button";
         listen.className = "secondary-action";
         listen.textContent = "听示范";
         listen.setAttribute("aria-label", `播放示范：${phrase.english}`);
-        listen.addEventListener("click", () => { void speech.playFixed(phrase.audio!, 1); });
-        root.append(english, listen);
+        listen.addEventListener("click", () => playWithFeedback(() => speech.playFixed(phrase.audio!, 1)));
+        root.append(english);
+        if (support === "full") root.append(chinese);
+        if (support !== "prompt-only") root.append(listen);
       }
 
       if (speechPhase === "idle") {
@@ -595,6 +660,8 @@ export function renderLesson(options: LessonViewOptions): LessonView {
               passed,
               answerRevealed: false,
               supportLevel: support,
+              hintCount: hintCountFor(support),
+              timestamp: new Date(now()).toISOString(),
               activity: "production"
             });
             candidateClass = candidateState.phraseClasses[phrase.id];

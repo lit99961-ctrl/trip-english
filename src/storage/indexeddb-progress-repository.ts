@@ -10,7 +10,9 @@ import {
   migrateProgress,
   type LearnerProgressV1
 } from "../domain/progress";
+import { scheduleReview, type ReviewOutcome } from "../domain/review-scheduler";
 import type {
+  LearningAttemptEvent,
   ProgressRepository,
   RestoreFinalizeOutcome,
   RestoreRollbackOutcome,
@@ -77,6 +79,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       throw new Error("speakingSeconds must be a non-negative finite number");
     }
     const isEventWrite = input.eventId !== undefined || input.speakingSecondsDelta !== undefined;
+    if (input.attemptEvent !== undefined && !isEventWrite) {
+      throw new Error("attemptEvent requires an exactly-once exercise event");
+    }
     if (isEventWrite && (!input.eventId || input.speakingSecondsDelta === undefined || !input.lessonState)) {
       throw new Error("eventId, speakingSecondsDelta, and lessonState are required together");
     }
@@ -103,7 +108,8 @@ export class IndexedDbProgressRepository implements ProgressRepository {
         exerciseId: input.exerciseId,
         completedExerciseIds: input.lessonState!.completedExerciseIds,
         phraseAttempts: input.lessonState!.phraseAttempts,
-        speakingSecondsDelta: input.speakingSecondsDelta
+        speakingSecondsDelta: input.speakingSecondsDelta,
+        ...(input.attemptEvent === undefined ? {} : { attemptEvent: input.attemptEvent })
       })
       : undefined;
     const storedEventPayload = input.eventId
@@ -115,6 +121,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       }
       await transaction.done;
       return progress;
+    }
+    if (input.attemptEvent && attemptEventWasProcessed(progress, input.attemptEvent.attemptId)) {
+      throw new Error(`attempt event was already processed: ${input.attemptEvent.attemptId}`);
     }
     const incomingCompletedIds = input.lessonState?.completedExerciseIds
       ?? (session.completedExerciseIds.includes(input.exerciseId)
@@ -134,9 +143,37 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     const phraseAttempts = input.lessonState === undefined
       ? session.phraseAttempts
       : mergeAttemptRecords(session.phraseAttempts, input.lessonState.phraseAttempts);
+    const phraseClasses = phraseAttempts === undefined
+      ? session.phraseClasses
+      : derivePhraseClasses(phraseAttempts);
+    const reviewUpdate = input.attemptEvent === undefined
+      ? undefined
+      : reviewForAttempt(input.attemptEvent, input.missionId, phraseAttempts ?? {}, phraseClasses ?? {});
+    const previousReview = reviewUpdate
+      ? progress.phraseReviews[reviewUpdate.phraseId]
+      : undefined;
+    const phraseReviews = reviewUpdate === undefined
+      ? progress.phraseReviews
+      : {
+        ...progress.phraseReviews,
+        [reviewUpdate.phraseId]: {
+          dueAt: reviewUpdate.dueAt,
+          successfulAttempts: (previousReview?.successfulAttempts ?? 0) + reviewUpdate.successfulAttemptDelta,
+          hintCount: (previousReview?.hintCount ?? 0) + reviewUpdate.hintCountDelta,
+          ...((previousReview?.masteredAt ?? reviewUpdate.masteredAt) === undefined ? {} : {
+            masteredAt: previousReview?.masteredAt ?? reviewUpdate.masteredAt
+          })
+        }
+      };
+    const promptFreeScenarioIds = reviewUpdate?.scenarioId === undefined
+      ? progress.promptFreeScenarioIds
+      : [...new Set([...progress.promptFreeScenarioIds, reviewUpdate.scenarioId])];
     const nextProgress: LearnerProgressV1 = {
       ...progress,
       activeMissionId: input.missionId,
+      phraseReviews,
+      hintCount: progress.hintCount + (reviewUpdate?.hintCountDelta ?? 0),
+      promptFreeScenarioIds,
       speakingSeconds: isEventWrite
         ? progress.speakingSeconds + input.speakingSecondsDelta!
         : input.speakingSeconds === undefined
@@ -149,7 +186,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
           completedExerciseIds,
           ...(phraseAttempts === undefined ? {} : {
             phraseAttempts,
-            phraseClasses: derivePhraseClasses(phraseAttempts)
+            phraseClasses
           }),
           ...(input.eventId === undefined ? {} : {
             exerciseEvents: {
@@ -304,6 +341,67 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
     return this.databasePromise;
   }
+}
+
+function attemptEventWasProcessed(progress: LearnerProgressV1, attemptId: string): boolean {
+  return Object.values(progress.sessions).some((session) =>
+    Object.values(session.exerciseEvents ?? {}).some((payload) => {
+      try {
+        const parsed = JSON.parse(payload) as { attemptEvent?: { attemptId?: unknown } };
+        return parsed.attemptEvent?.attemptId === attemptId;
+      } catch {
+        return false;
+      }
+    })
+  );
+}
+
+function reviewForAttempt(
+  event: LearningAttemptEvent,
+  missionId: string,
+  attemptsByPhrase: Record<string, Attempt[]>,
+  classes: Record<string, AttemptClass>
+): {
+  phraseId: string;
+  dueAt: string;
+  successfulAttemptDelta: number;
+  hintCountDelta: number;
+  masteredAt?: string;
+  scenarioId?: string;
+} {
+  if (event.missionId !== missionId) throw new Error("attempt event mission does not match exercise event");
+  const occurredAt = new Date(event.occurredAt);
+  if (Number.isNaN(occurredAt.getTime()) || occurredAt.toISOString() !== event.occurredAt) {
+    throw new Error("attempt event occurredAt must be an ISO timestamp");
+  }
+  const attempt = attemptsByPhrase[event.phraseId]?.find((item) => item.attemptId === event.attemptId);
+  if (!attempt) throw new Error("attempt event must reference a persisted attempt");
+  if (attempt.timestamp !== event.occurredAt) throw new Error("attempt event timestamp does not match attempt");
+  const hintCount = attempt.hintCount ?? 0;
+  if (event.hintUsed !== (hintCount > 0)) throw new Error("attempt event hint usage does not match attempt");
+
+  const productionPass = attempt.passed && attempt.activity !== "choice";
+  const promptFreePass = productionPass
+    && attempt.supportLevel === "prompt-only"
+    && !attempt.answerRevealed;
+  const mastered = classes[event.phraseId] === "mastered";
+  const outcome: ReviewOutcome = !attempt.passed
+    ? "failed"
+    : mastered ? "mastered" : promptFreePass ? "prompt-free" : "supported";
+  const schedule = scheduleReview({
+    outcome,
+    confidence: !attempt.passed ? 1 : promptFreePass || mastered ? 3 : 2,
+    hintCount,
+    now: occurredAt
+  });
+  return {
+    phraseId: event.phraseId,
+    dueAt: schedule.dueAt,
+    successfulAttemptDelta: productionPass ? 1 : 0,
+    hintCountDelta: hintCount,
+    ...(mastered ? { masteredAt: event.occurredAt } : {}),
+    ...(promptFreePass && event.scenarioId ? { scenarioId: event.scenarioId } : {})
+  };
 }
 
 function progressesEqual(storedProgress: unknown, expectedProgress: LearnerProgressV1): boolean {

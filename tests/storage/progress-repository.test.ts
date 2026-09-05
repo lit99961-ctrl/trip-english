@@ -494,6 +494,207 @@ describe("IndexedDbProgressRepository", () => {
     expect((await repository.load()).sessions.hotel!.completedExerciseIds).toEqual(["e1"]);
   });
 
+  test("updates review metrics and prompt-free scenarios exactly once per learning event", async () => {
+    const repository = createRepository();
+    const phraseId = "reservation";
+    const supportedAt = "2026-09-05T10:00:00.000Z";
+    const supportedAttempt = {
+      attemptId: "review-a", supportLevel: "english" as const, passed: true,
+      answerRevealed: false, hintCount: 1, timestamp: supportedAt,
+      activity: "production" as const
+    };
+    const firstEvent = {
+      missionId: "hotel",
+      exerciseId: "e1",
+      eventId: "review-event-a",
+      speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "review-a", phraseId, missionId: "hotel", hintUsed: true,
+        occurredAt: supportedAt
+      },
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: { [phraseId]: [supportedAttempt] },
+        phraseClasses: { [phraseId]: "practiced" as const }
+      }
+    };
+    await repository.saveExerciseResult(firstEvent);
+    await repository.saveExerciseResult(firstEvent);
+    let stored = await repository.load();
+    expect(stored.phraseReviews[phraseId]).toMatchObject({
+      dueAt: "2026-09-06T10:00:00.000Z",
+      successfulAttempts: 1,
+      hintCount: 1
+    });
+    expect(stored.hintCount).toBe(1);
+
+    const promptFreeAt = "2026-09-06T10:00:00.000Z";
+    const promptFreeAttempt = {
+      attemptId: "review-b", supportLevel: "prompt-only" as const, passed: true,
+      answerRevealed: false, hintCount: 0, timestamp: promptFreeAt,
+      activity: "production" as const
+    };
+    await repository.saveExerciseResult({
+      missionId: "hotel", exerciseId: "e2", eventId: "review-event-b",
+      speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "review-b", phraseId, missionId: "hotel", scenarioId: "hotel-roleplay",
+        hintUsed: false, occurredAt: promptFreeAt
+      },
+      lessonState: {
+        completedExerciseIds: ["e1", "e2"],
+        phraseAttempts: { [phraseId]: [supportedAttempt, promptFreeAttempt] },
+        phraseClasses: { [phraseId]: "recalled" }
+      }
+    });
+    stored = await repository.load();
+    expect(stored.phraseReviews[phraseId]!.dueAt).toBe("2026-09-09T10:00:00.000Z");
+    expect(stored.promptFreeScenarioIds).toEqual(["hotel-roleplay"]);
+    expect(stored.phraseReviews[phraseId]!.masteredAt).toBeUndefined();
+
+    const masteredAt = "2026-09-07T10:00:00.000Z";
+    const thirdAttempt = {
+      attemptId: "review-c", supportLevel: "english" as const, passed: true,
+      answerRevealed: false, hintCount: 0, timestamp: masteredAt,
+      activity: "production" as const
+    };
+    await repository.saveExerciseResult({
+      missionId: "hotel", exerciseId: "e3", eventId: "review-event-c",
+      speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "review-c", phraseId, missionId: "hotel", hintUsed: false,
+        occurredAt: masteredAt
+      },
+      lessonState: {
+        completedExerciseIds: ["e1", "e2", "e3"],
+        phraseAttempts: { [phraseId]: [supportedAttempt, promptFreeAttempt, thirdAttempt] },
+        phraseClasses: { [phraseId]: "mastered" }
+      }
+    });
+    stored = await repository.load();
+    expect(stored.phraseReviews[phraseId]!.masteredAt).toBe(masteredAt);
+    expect(stored.phraseReviews[phraseId]!.successfulAttempts).toBe(3);
+  });
+
+  test("schedules a failed self-rating in the same session", async () => {
+    const repository = createRepository();
+    const occurredAt = "2026-09-05T10:00:00.000Z";
+    const attempt = {
+      attemptId: "failed-a", supportLevel: "partial" as const, passed: false,
+      answerRevealed: false, hintCount: 1, timestamp: occurredAt,
+      activity: "production" as const
+    };
+    await repository.saveExerciseResult({
+      missionId: "hotel", exerciseId: "e1", eventId: "failed-event",
+      speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "failed-a", phraseId: "reservation", missionId: "hotel",
+        hintUsed: true, occurredAt
+      },
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: { reservation: [attempt] },
+        phraseClasses: { reservation: "practiced" }
+      }
+    });
+
+    const stored = await repository.load();
+    expect(stored.phraseReviews.reservation).toMatchObject({
+      dueAt: "2026-09-05T10:10:00.000Z",
+      successfulAttempts: 0,
+      hintCount: 1
+    });
+  });
+
+  test("rejects reusing an attempt under a different learning event", async () => {
+    const repository = createRepository();
+    const occurredAt = "2026-09-05T10:00:00.000Z";
+    const attempt = {
+      attemptId: "attempt-once", supportLevel: "english" as const, passed: true,
+      answerRevealed: false, hintCount: 1, timestamp: occurredAt,
+      activity: "production" as const
+    };
+    const first = {
+      missionId: "hotel", exerciseId: "e1", eventId: "event-once",
+      speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "attempt-once", phraseId: "reservation", missionId: "hotel",
+        hintUsed: true, occurredAt
+      },
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: { reservation: [attempt] },
+        phraseClasses: { reservation: "practiced" as const }
+      }
+    };
+    await repository.saveExerciseResult(first);
+
+    await expect(repository.saveExerciseResult({
+      ...first,
+      exerciseId: "e2",
+      eventId: "different-event",
+      lessonState: { ...first.lessonState, completedExerciseIds: ["e1", "e2"] }
+    })).rejects.toThrow("attempt event was already processed");
+    expect((await repository.load()).hintCount).toBe(1);
+  });
+
+  test("requires exactly-once event fields when attempt metrics are submitted", async () => {
+    const repository = createRepository();
+    await expect(repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      attemptEvent: {
+        attemptId: "orphan-attempt", phraseId: "reservation", missionId: "hotel",
+        hintUsed: false, occurredAt: "2026-09-05T10:00:00.000Z"
+      }
+    })).rejects.toThrow("attemptEvent requires an exactly-once exercise event");
+  });
+
+  test("merges review metrics from interleaved repository instances", async () => {
+    const repository = createRepository();
+    const oldViewRepository = new IndexedDbProgressRepository(databaseNames[0]);
+    repositories.push(oldViewRepository);
+    await oldViewRepository.load();
+    const firstAt = "2026-09-05T10:00:00.000Z";
+    const secondAt = "2026-09-05T10:01:00.000Z";
+
+    await repository.saveExerciseResult({
+      missionId: "hotel", exerciseId: "h1", eventId: "metric-a", speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "metric-attempt-a", phraseId: "help", missionId: "hotel",
+        scenarioId: "hotel-help", hintUsed: false, occurredAt: firstAt
+      },
+      lessonState: {
+        completedExerciseIds: ["h1"],
+        phraseAttempts: { help: [{
+          attemptId: "metric-attempt-a", supportLevel: "prompt-only", passed: true,
+          answerRevealed: false, hintCount: 0, timestamp: firstAt, activity: "production"
+        }] },
+        phraseClasses: { help: "recalled" }
+      }
+    });
+    await oldViewRepository.saveExerciseResult({
+      missionId: "train", exerciseId: "t1", eventId: "metric-b", speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "metric-attempt-b", phraseId: "help", missionId: "train",
+        hintUsed: true, occurredAt: secondAt
+      },
+      lessonState: {
+        completedExerciseIds: ["t1"],
+        phraseAttempts: { help: [{
+          attemptId: "metric-attempt-b", supportLevel: "english", passed: true,
+          answerRevealed: false, hintCount: 1, timestamp: secondAt, activity: "production"
+        }] },
+        phraseClasses: { help: "practiced" }
+      }
+    });
+
+    const stored = await repository.load();
+    expect(stored.phraseReviews.help).toMatchObject({ successfulAttempts: 2, hintCount: 1 });
+    expect(stored.hintCount).toBe(1);
+    expect(stored.promptFreeScenarioIds).toEqual(["hotel-help"]);
+  });
+
   test("reset clears progress and recordings while leaving the repository usable", async () => {
     const repository = createRepository();
     await repository.saveExerciseResult({ missionId: "hotel", exerciseId: "listen-1" });

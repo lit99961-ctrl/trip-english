@@ -8,6 +8,16 @@ export interface SaveExerciseResultInput {
   speakingSeconds?: number;
   eventId?: string;
   speakingSecondsDelta?: number;
+  attemptEvent?: LearningAttemptEvent;
+}
+
+export interface LearningAttemptEvent {
+  attemptId: string;
+  phraseId: string;
+  missionId: string;
+  scenarioId?: string;
+  hintUsed: boolean;
+  occurredAt: string;
 }
 
 export interface SaveCalibrationResultInput {
