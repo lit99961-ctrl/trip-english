@@ -25,6 +25,22 @@ describe("scoreTranscript", () => {
       .toBe("i am li i will check in do not worry");
   });
 
+  it.each([
+    ["you're", "you are"], ["we're", "we are"], ["they're", "they are"],
+    ["he's", "he is"], ["she's", "she is"], ["it's", "it is"],
+    ["isn't", "is not"], ["aren't", "are not"], ["wasn't", "was not"],
+    ["weren't", "were not"], ["doesn't", "does not"], ["didn't", "did not"],
+    ["hasn't", "has not"], ["haven't", "have not"], ["hadn't", "had not"],
+    ["wouldn't", "would not"], ["shouldn't", "should not"], ["mustn't", "must not"]
+  ])("normalizes the common contraction %s in straight and curly forms", (contraction, expanded) => {
+    expect(normalizeTranscript(contraction)).toBe(expanded);
+    expect(normalizeTranscript(contraction.replace("'", "’"))).toBe(expanded);
+  });
+
+  it("does not mistake an arbitrary possessive for a contraction", () => {
+    expect(normalizeTranscript("Li's booking")).toBe("li s booking");
+  });
+
   it("matches multiword phrases only at token boundaries", () => {
     expect(scoreTranscript("Please check in my reservation", {
       requiredKeywords: [["check in"]]

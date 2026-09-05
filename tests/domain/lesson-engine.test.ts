@@ -38,6 +38,20 @@ describe("mastery classification", () => {
       .toBe("recalled");
   });
 
+  it("requires explicit prompt-only support before omitted-support attempts can recall or master", () => {
+    let state = createLessonState();
+    for (let index = 0; index < 3; index += 1) {
+      expect(classifyAttempt({ passed: true, answerRevealed: false })).toBe("practiced");
+      state = recordPhraseAttempt(lesson, state, "reservation", {
+        passed: true,
+        answerRevealed: false
+      });
+    }
+
+    expect(state.phraseClasses.reservation).toBe("practiced");
+    expect(canMaster(state.phraseAttempts.reservation ?? [])).toBe(false);
+  });
+
   it("requires exactly three passed production attempts including one prompt-free recall", () => {
     const history: Attempt[] = [
       { supportLevel: "full", passed: true, answerRevealed: true },
@@ -93,6 +107,17 @@ describe("lesson engine", () => {
 
   it("rejects unknown completion IDs safely", () => {
     expect(() => completeExercise(lesson, createLessonState(), "invented")).toThrow("Unknown exercise");
+  });
+
+  it("rejects a later exercise until every earlier exercise is complete", () => {
+    const initial = createLessonState();
+
+    expect(() => completeExercise(lesson, initial, "speak")).toThrow("next exercise");
+    expect(initial.completedExerciseIds).toEqual([]);
+
+    const afterListen = completeExercise(lesson, initial, "listen");
+    const afterSpeak = completeExercise(lesson, afterListen, "speak");
+    expect(afterSpeak.completedExerciseIds).toEqual(["listen", "speak"]);
   });
 
   it("updates a phrase class from recorded attempt history", () => {

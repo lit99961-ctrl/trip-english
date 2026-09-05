@@ -14,10 +14,28 @@ const contractions: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bi'd\b/gu, "i would"],
   [/\bi'll\b/gu, "i will"],
   [/\bi've\b/gu, "i have"],
+  [/\byou're\b/gu, "you are"],
+  [/\bwe're\b/gu, "we are"],
+  [/\bthey're\b/gu, "they are"],
+  [/\bhe's\b/gu, "he is"],
+  [/\bshe's\b/gu, "she is"],
+  [/\bit's\b/gu, "it is"],
   [/\bdon't\b/gu, "do not"],
   [/\bcan't\b/gu, "cannot"],
   [/\bcouldn't\b/gu, "could not"],
-  [/\bwon't\b/gu, "will not"]
+  [/\bwon't\b/gu, "will not"],
+  [/\bisn't\b/gu, "is not"],
+  [/\baren't\b/gu, "are not"],
+  [/\bwasn't\b/gu, "was not"],
+  [/\bweren't\b/gu, "were not"],
+  [/\bdoesn't\b/gu, "does not"],
+  [/\bdidn't\b/gu, "did not"],
+  [/\bhasn't\b/gu, "has not"],
+  [/\bhaven't\b/gu, "have not"],
+  [/\bhadn't\b/gu, "had not"],
+  [/\bwouldn't\b/gu, "would not"],
+  [/\bshouldn't\b/gu, "should not"],
+  [/\bmustn't\b/gu, "must not"]
 ];
 
 /** Normalizes text for intent matching; it intentionally does not assess pronunciation. */

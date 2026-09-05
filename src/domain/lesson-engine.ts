@@ -44,7 +44,7 @@ function normalizeAttempt(input: AttemptInput): Attempt {
   assertHintCount(input.hintCount);
   const hintCount = input.hintCount ?? 0;
   return {
-    supportLevel: input.supportLevel ?? (input.answerRevealed ? "full" : hintCount > 0 ? "partial" : "prompt-only"),
+    supportLevel: input.supportLevel ?? (input.answerRevealed ? "full" : hintCount > 0 ? "partial" : "english"),
     passed: input.passed,
     answerRevealed: input.answerRevealed,
     ...(input.hintCount === undefined ? {} : { hintCount: input.hintCount }),
@@ -68,9 +68,8 @@ export function canMaster(history: readonly Attempt[]): boolean {
 }
 
 /**
- * Classifies the current attempt. Missing support defaults to prompt-only only
- * when no answer was revealed and no hint was used, keeping the common input
- * `{ passed, answerRevealed, hintCount }` valid without disguising support.
+ * Classifies the current attempt. Missing support defaults conservatively to
+ * English support, so only an explicit prompt-only setting can prove recall.
  */
 export function classifyAttempt(input: AttemptInput): AttemptClass {
   const attempt = normalizeAttempt(input);
@@ -120,6 +119,10 @@ export function completeExercise(definition: LessonDefinition, state: LessonStat
   assertKnownId(definition.exerciseIds, exerciseId, "exercise");
   if (state.completedExerciseIds.includes(exerciseId)) {
     return state;
+  }
+  const current = nextExercise(definition, state);
+  if (current !== exerciseId) {
+    throw new Error(`Exercise must be the next exercise: ${current ?? "none"}`);
   }
   return { ...state, completedExerciseIds: [...state.completedExerciseIds, exerciseId] };
 }
