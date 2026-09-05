@@ -40,7 +40,7 @@ const contextProperNameOverrides = new Map(Object.entries({
   "rialto": properName("里亚托（威尼斯地名/里亚托桥）"),
   "rome": properName("罗马（意大利城市）"),
   "switzerland": properName("瑞士（国家）"),
-  "termini": properName("罗马特米尼火车站", "/ˈtɛːrmini/"),
+  "termini": properName("罗马特米尼火车站", "/ˈtɛr.mi.ni/"),
   "vatican": properName("梵蒂冈（梵蒂冈博物馆）"),
   "venice": properName("威尼斯（意大利城市）"),
   "zermatt": properName("采尔马特（瑞士城镇）"),

@@ -135,8 +135,8 @@ describe("generated offline dictionary", () => {
       expect(dictionary.get(word)?.phonetic, `${word} should retain ECDICT phonetic`).toEqual(expect.any(String));
     }
     // Rome Termini uses the Italian station-name pronunciation, not ECDICT's
-    // inherited Latin plural pronunciation /ˈtɜːmɪnaɪ/.
-    expect(dictionary.get("termini")?.phonetic).toBe("/ˈtɛːrmini/");
+    // inherited English pronunciation of the Latin-derived plural /ˈtɜːmɪnaɪ/.
+    expect(dictionary.get("termini")?.phonetic).toBe("/ˈtɛr.mi.ni/");
   });
 
   it("pins ECDICT and records its license and transformation", () => {
