@@ -25,9 +25,12 @@ export function validateCatalog(candidate: unknown = seedCatalog): readonly Miss
     missions.flatMap((mission) => mission.productionPhrases.map((phrase) => phrase.id)),
     "production phrase"
   );
+  assertUnique(
+    missions.flatMap((mission) => mission.exercises.map((exercise) => exercise.id)),
+    "exercise"
+  );
 
   for (const mission of missions) {
-    assertUnique(mission.exercises.map((exercise) => exercise.id), "exercise");
     const phraseIds = new Set(mission.productionPhrases.map((phrase) => phrase.id));
 
     for (const exercise of mission.exercises) {
@@ -47,7 +50,7 @@ const seedCatalog = [
     id: "airport-arrival",
     kind: "travel",
     titleZh: "抵达机场",
-    city: "Tokyo",
+    city: "Milan",
     productionPhrases: [
       { id: "airport-help", english: "Could you help me?", chinese: "你能帮我吗？", intent: "ask-help", keywords: ["help"], recovery: true },
       { id: "airport-arrival", english: "I just arrived.", chinese: "我刚到。", intent: "state-arrival", keywords: ["arrived"], recovery: false },

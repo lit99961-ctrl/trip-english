@@ -6,7 +6,7 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
     id: "hotel",
     kind: "travel",
     titleZh: "入住酒店",
-    city: "Tokyo",
+    city: "Milan",
     productionPhrases: [
       { id: "hotel-check-in", english: "I have a reservation.", chinese: "我有预订。", intent: "check-in", keywords: ["reservation"], recovery: true },
       { id: "hotel-name", english: "My name is Li.", chinese: "我叫李。", intent: "identify", keywords: ["name"] },
@@ -48,6 +48,25 @@ describe("course catalog", () => {
     );
     expect(() => validateCatalog([candidateMission({ exercises: candidateMission().exercises.map((exercise, index) => index === 1 ? { ...exercise, id: "hotel-intent" } : exercise) })])).toThrow(
       "exercise duplicate ids: hotel-intent"
+    );
+  });
+
+  it("rejects exercise IDs reused across missions", () => {
+    const firstMission = candidateMission();
+    const secondMission = candidateMission({
+      id: "hotel-2",
+      productionPhrases: firstMission.productionPhrases.map((phrase) => ({
+        ...phrase,
+        id: `${phrase.id}-2`
+      })),
+      exercises: firstMission.exercises.map((exercise) => ({
+        ...exercise,
+        phraseId: exercise.phraseId === undefined ? undefined : `${exercise.phraseId}-2`
+      }))
+    });
+
+    expect(() => validateCatalog([firstMission, secondMission])).toThrow(
+      "exercise duplicate ids: hotel-intent, hotel-shadow, hotel-recall, hotel-roleplay, hotel-reading"
     );
   });
 
