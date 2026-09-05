@@ -197,17 +197,23 @@ async function restorePreparedBackup(
   try {
     const finalized = await repository.finalizeRestore(token, progress);
     if (finalized.status === "finalized") {
-      return { restored: true, cleanupPending: false, progress };
+      return {
+        restored: true,
+        cleanupPending: false,
+        progress: validateProgress(finalized.progress ?? progress)
+      };
     }
+    await repository.rollbackRestore(token, progress);
     return { restored: false, reason: "superseded" };
-  } catch {
-    // The restored state has already re-opened successfully; retain its checkpoint for later cleanup.
-    return {
-      restored: true,
-      cleanupPending: true,
-      progress,
-      cleanupHandle: createCleanupHandle(token, progress)
-    };
+  } catch (error) {
+    try {
+      await repository.rollbackRestore(token, progress);
+    } catch (rollbackError) {
+      throw new Error("restore finalization failed and rollback failed", {
+        cause: { finalizeError: error, rollbackError }
+      });
+    }
+    throw error;
   }
 }
 

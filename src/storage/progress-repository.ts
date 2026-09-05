@@ -36,7 +36,7 @@ export type RestoreRollbackOutcome =
   | { status: "checkpoint-mismatch" };
 
 export type RestoreFinalizeOutcome =
-  | { status: "finalized" }
+  | { status: "finalized"; progress?: LearnerProgressV1 }
   | { status: "checkpoint-mismatch" };
 
 export interface ProgressRepository {

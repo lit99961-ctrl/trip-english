@@ -57,12 +57,21 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
   public async load(): Promise<LearnerProgressV1> {
     const database = await this.getDatabase();
-    const transaction = database.transaction("progress", "readwrite");
-    const storedProgress = await transaction.store.get(PROGRESS_KEY);
-    const progress = projectReviewHistory(migrateProgress(storedProgress, this.now()));
+    const transaction = database.transaction(["progress", "restore-checkpoints"], "readwrite");
+    const storedProgress = await transaction.objectStore("progress").get(PROGRESS_KEY);
+    const checkpoint = await transaction.objectStore("restore-checkpoints").get(RESTORE_CHECKPOINT_KEY);
+    const migratedProgress = migrateProgress(storedProgress, this.now());
+
+    // Restore verification must observe the exact candidate snapshot. Projecting
+    // it here would mutate the CAS target before finalize or rollback can compare it.
+    if (checkpoint) {
+      await transaction.done;
+      return migratedProgress;
+    }
+    const progress = projectReviewHistory(migratedProgress);
 
     if (storedProgress === undefined || stableJson(storedProgress) !== stableJson(progress)) {
-      await transaction.store.put(progress, PROGRESS_KEY);
+      await transaction.objectStore("progress").put(progress, PROGRESS_KEY);
     }
 
     await transaction.done;
@@ -330,9 +339,14 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       return { status: "checkpoint-mismatch" };
     }
 
+    const projectedProgress = migrateProgress(
+      projectReviewHistory(migrateProgress(currentProgress, this.now())),
+      this.now()
+    );
+    await transaction.objectStore("progress").put(projectedProgress, PROGRESS_KEY);
     await transaction.objectStore("restore-checkpoints").delete(RESTORE_CHECKPOINT_KEY);
     await transaction.done;
-    return { status: "finalized" };
+    return { status: "finalized", progress: projectedProgress };
   }
 
   public async reset(): Promise<void> {

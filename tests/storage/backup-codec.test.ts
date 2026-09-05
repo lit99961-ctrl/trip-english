@@ -10,7 +10,6 @@ import {
   encodeBackup,
   inspectBackupImport,
   readBackupText,
-  retryRestoreCleanup,
   restoreBackup
 } from "../../src/storage/backup-codec";
 
@@ -144,6 +143,42 @@ describe("backup codec", () => {
 });
 
 describe("safe backup restore", () => {
+  test("restores and projects a legacy backup through the public API", async () => {
+    const repository = createRepository();
+    await seed(repository, progressFixture);
+    const legacy: LearnerProgressV1 = {
+      ...progressFixture,
+      activeMissionId: "legacy",
+      sessions: {
+        legacy: {
+          missionId: "legacy", completedExerciseIds: ["old-1"],
+          phraseAttempts: { help: [{
+            supportLevel: "prompt-only", passed: true, answerRevealed: false,
+            hintCount: 1, activity: "production"
+          }] },
+          phraseClasses: { help: "recalled" }
+        }
+      },
+      phraseReviews: {},
+      hintCount: 1
+    };
+
+    const result = await restoreBackup(repository, encodeBackup(legacy), true);
+
+    expect(result).toMatchObject({
+      restored: true,
+      cleanupPending: false,
+      progress: {
+        activeMissionId: "legacy",
+        reviewProjectionVersion: 1,
+        phraseReviews: { help: { successfulAttempts: 1, hintCount: 1 } }
+      }
+    });
+    await expect(repository.load()).resolves.toEqual(
+      result.restored ? result.progress : undefined
+    );
+  });
+
   test("rejects an invalid backup without changing existing IndexedDB progress", async () => {
     const repository = createRepository();
     await seed(repository, progressFixture);
@@ -292,35 +327,53 @@ describe("safe backup restore", () => {
     await expect(repository.load()).resolves.toEqual(newerProgress);
   });
 
-  test("returns a cleanup handle after a transient finalize failure and retries it safely", async () => {
+  test("rolls back progress and clears its checkpoint after a finalize failure", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
     repository.failFinalizeOnce = true;
     const restoredProgress = { ...progressFixture, activeMissionId: "taxi" };
 
-    const result = await restoreBackup(repository, encodeBackup(restoredProgress), true);
-
-    expect(result).toMatchObject({ restored: true, cleanupPending: true, progress: restoredProgress });
-    if (!result.restored || !result.cleanupPending) throw new Error("expected cleanup handle");
-    await expect(retryRestoreCleanup(repository, result.cleanupHandle)).resolves.toEqual({
-      status: "finalized"
-    });
-    await expect(repository.load()).resolves.toEqual(restoredProgress);
+    await expect(restoreBackup(repository, encodeBackup(restoredProgress), true))
+      .rejects.toThrow("checkpoint cleanup failed");
+    await expect(repository.load()).resolves.toEqual(progressFixture);
     expect(repository.checkpointPresent).toBe(false);
   });
 
-  test("does not overwrite newer progress when cleanup retry is superseded", async () => {
+  test("preserves a newer concurrent update while cleaning up a failed finalize", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
     repository.failFinalizeOnce = true;
     const restoredProgress = { ...progressFixture, activeMissionId: "airport" };
     const newerProgress = { ...progressFixture, activeMissionId: "taxi" };
-    const result = await restoreBackup(repository, encodeBackup(restoredProgress), true);
-    if (!result.restored || !result.cleanupPending) throw new Error("expected cleanup handle");
     repository.interleaveBeforeFinalize = newerProgress;
 
-    await expect(retryRestoreCleanup(repository, result.cleanupHandle)).resolves.toEqual({
-      status: "checkpoint-mismatch"
-    });
+    await expect(restoreBackup(repository, encodeBackup(restoredProgress), true))
+      .rejects.toThrow("checkpoint cleanup failed");
     await expect(repository.load()).resolves.toEqual(newerProgress);
+    expect(repository.checkpointPresent).toBe(false);
+  });
+
+  test("rolls back the imported state when legacy projection validation fails", async () => {
+    const repository = createRepository();
+    await seed(repository, progressFixture);
+    const invalidProjection: LearnerProgressV1 = {
+      ...progressFixture,
+      sessions: {
+        legacy: {
+          missionId: "legacy", completedExerciseIds: ["old"],
+          phraseAttempts: { help: [{
+            supportLevel: "prompt-only", passed: true, answerRevealed: false,
+            timestamp: "9999-12-31T23:59:59.999Z", activity: "production"
+          }] },
+          phraseClasses: { help: "recalled" }
+        }
+      }
+    };
+
+    await expect(restoreBackup(repository, encodeBackup(invalidProjection), true)).rejects.toThrow();
+    await expect(repository.load()).resolves.toEqual(progressFixture);
+    await expect(restoreBackup(repository, encodeBackup(progressFixture), true)).resolves.toMatchObject({
+      restored: true,
+      cleanupPending: false
+    });
   });
 });
 
