@@ -120,6 +120,27 @@ describe("lesson engine", () => {
     expect(afterSpeak.completedExerciseIds).toEqual(["listen", "speak"]);
   });
 
+  it.each([
+    ["starts with a later exercise", ["speak"]],
+    ["duplicates a completed exercise", ["listen", "listen"]],
+    ["skips an exercise in the middle", ["listen", "recall"]]
+  ])("rejects restored state that %s", (_description, completedExerciseIds) => {
+    const restored = { ...createLessonState(), completedExerciseIds };
+
+    expect(() => nextExercise(lesson, restored)).toThrow("completedExerciseIds");
+    expect(() => completeExercise(lesson, restored, "listen")).toThrow("completedExerciseIds");
+    expect(restored.completedExerciseIds).toEqual(completedExerciseIds);
+  });
+
+  it("rejects restored phrase classes for unknown phrases", () => {
+    const restored = {
+      ...createLessonState(),
+      phraseClasses: { invented: "practiced" as const }
+    };
+
+    expect(() => nextExercise(lesson, restored)).toThrow("Unknown phrase");
+  });
+
   it("updates a phrase class from recorded attempt history", () => {
     let state = createLessonState();
     state = recordPhraseAttempt(lesson, state, "reservation", {

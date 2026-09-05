@@ -99,10 +99,15 @@ function assertKnownId(ids: readonly string[], id: string, label: string): void 
 }
 
 function assertStateMatchesLesson(definition: LessonDefinition, state: LessonState): void {
-  for (const exerciseId of state.completedExerciseIds) {
-    assertKnownId(definition.exerciseIds, exerciseId, "exercise");
+  for (const [index, exerciseId] of state.completedExerciseIds.entries()) {
+    if (exerciseId !== definition.exerciseIds[index]) {
+      throw new Error("completedExerciseIds must be a unique authored-order prefix of exerciseIds");
+    }
   }
   for (const phraseId of Object.keys(state.phraseAttempts)) {
+    assertKnownId(definition.phraseIds, phraseId, "phrase");
+  }
+  for (const phraseId of Object.keys(state.phraseClasses)) {
     assertKnownId(definition.phraseIds, phraseId, "phrase");
   }
 }

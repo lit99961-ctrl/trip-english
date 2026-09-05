@@ -28,8 +28,16 @@ describe("scheduleReview", () => {
     expect(scheduleReview({ outcome: "supported", confidence: 3, hintCount: 2, now })).toMatchObject({
       dueAt: "2026-09-05T10:10:00.000Z",
       intervalMinutes: 10,
-      reason: "supported success with low confidence"
+      reason: "supported success with extra support"
     });
+  });
+
+  it.each([
+    ["low confidence only", 1, 0, "supported success with low confidence"],
+    ["two hints only", 3, 2, "supported success with extra support"],
+    ["low confidence and two hints", 1, 2, "supported success with low confidence and extra support"]
+  ] as const)("uses an accurate shortened reason for %s", (_condition, confidence, hintCount, reason) => {
+    expect(scheduleReview({ outcome: "supported", confidence, hintCount, now }).reason).toBe(reason);
   });
 
   it("does not shorten a review after exactly one hint", () => {

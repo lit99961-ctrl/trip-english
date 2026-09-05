@@ -32,6 +32,16 @@ function assertValidRequest(request: ReviewRequest): void {
   }
 }
 
+function shortenedReason(base: string, lowConfidence: boolean, extraSupport: boolean): string {
+  if (lowConfidence && extraSupport) {
+    return `${base} with low confidence and extra support`;
+  }
+  if (lowConfidence) {
+    return `${base} with low confidence`;
+  }
+  return `${base} with extra support`;
+}
+
 /**
  * Schedules the next retrieval opportunity with UTC millisecond arithmetic.
  * Low confidence is confidence 1; two or more hints have the same effect.
@@ -39,7 +49,9 @@ function assertValidRequest(request: ReviewRequest): void {
 export function scheduleReview(request: ReviewRequest): ReviewSchedule {
   assertValidRequest(request);
 
-  const shorten = request.confidence === 1 || request.hintCount >= 2;
+  const lowConfidence = request.confidence === 1;
+  const extraSupport = request.hintCount >= 2;
+  const shorten = lowConfidence || extraSupport;
   let intervalMinutes: number;
   let reason: string;
 
@@ -50,15 +62,21 @@ export function scheduleReview(request: ReviewRequest): ReviewSchedule {
       break;
     case "supported":
       intervalMinutes = shorten ? TEN_MINUTES : ONE_DAY;
-      reason = shorten ? "supported success with low confidence" : "supported success";
+      reason = shorten
+        ? shortenedReason("supported success", lowConfidence, extraSupport)
+        : "supported success";
       break;
     case "prompt-free":
       intervalMinutes = shorten ? ONE_DAY : THREE_DAYS;
-      reason = shorten ? "prompt-free recall with low confidence" : "prompt-free recall";
+      reason = shorten
+        ? shortenedReason("prompt-free recall", lowConfidence, extraSupport)
+        : "prompt-free recall";
       break;
     case "mastered":
       intervalMinutes = shorten ? THREE_DAYS : SEVEN_DAYS;
-      reason = shorten ? "mastered recall with low confidence" : "mastered recall";
+      reason = shorten
+        ? shortenedReason("mastered recall", lowConfidence, extraSupport)
+        : "mastered recall";
       break;
     default: {
       const impossible: never = request.outcome;
