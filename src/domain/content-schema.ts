@@ -12,13 +12,21 @@ export const phraseSchema = z.object({
   activeTarget: z.boolean().default(false)
 });
 
-const exerciseSchema = z.object({
+const exerciseFields = {
   id: z.string(),
-  type: z.enum(["intent", "shadow", "recall", "roleplay", "reading"]),
   phraseId: z.string().optional(),
   promptZh: z.string().min(1),
-  variation: z.record(z.string(), z.string()).optional()
-});
+  variation: z.record(z.string(), z.string()).optional(),
+  readingText: z.string().min(1).optional()
+};
+
+const exerciseSchema = z.discriminatedUnion("type", [
+  z.object({ ...exerciseFields, type: z.literal("intent") }),
+  z.object({ ...exerciseFields, type: z.literal("shadow") }),
+  z.object({ ...exerciseFields, type: z.literal("recall") }),
+  z.object({ ...exerciseFields, type: z.literal("roleplay"), variation: z.record(z.string(), z.string()) }),
+  z.object({ ...exerciseFields, type: z.literal("reading"), readingText: z.string().min(1) })
+]);
 
 const missionFields = {
   id: z.string().min(1),

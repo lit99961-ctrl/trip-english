@@ -19,8 +19,8 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
       { id: "hotel-intent", type: "intent", phraseId: "hotel-check-in", promptZh: "选择入住意图" },
       { id: "hotel-shadow", type: "shadow", phraseId: "hotel-name", promptZh: "跟读姓名" },
       { id: "hotel-recall", type: "recall", phraseId: "hotel-room", promptZh: "回忆房间" },
-      { id: "hotel-roleplay", type: "roleplay", phraseId: "hotel-key", promptZh: "索要房卡" },
-      { id: "hotel-reading", type: "reading", phraseId: "hotel-thanks", promptZh: "朗读致谢" }
+      { id: "hotel-roleplay", type: "roleplay", phraseId: "hotel-key", promptZh: "索要房卡", variation: { keys: "two" } },
+      { id: "hotel-reading", type: "reading", phraseId: "hotel-thanks", promptZh: "朗读致谢", readingText: "HOTEL NOTICE: THANK YOU." }
     ],
     ...overrides
   };

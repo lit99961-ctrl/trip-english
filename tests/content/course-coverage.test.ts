@@ -47,10 +47,47 @@ describe("itinerary course coverage", () => {
     for (const mission of travelMissions) {
       const types = mission.exercises.map((exercise) => exercise.type);
       const phraseIds = new Set(mission.productionPhrases.map((phrase) => phrase.id));
-      expect(types.filter((type) => type === "shadow")).toHaveLength(2);
+      const shadowPhraseIds = mission.exercises
+        .filter((exercise) => exercise.type === "shadow")
+        .map((exercise) => exercise.phraseId);
+      expect(shadowPhraseIds).toHaveLength(2);
+      expect(new Set(shadowPhraseIds).size).toBe(2);
       expect(types).toEqual(expect.arrayContaining(["intent", "recall", "roleplay", "reading"]));
       expect(mission.exercises.every((exercise) => !exercise.phraseId || phraseIds.has(exercise.phraseId))).toBe(true);
     }
+  });
+
+  it("gives every travel reading exercise a credible, unique real-world text", () => {
+    const readings = travelMissions.flatMap((mission) =>
+      mission.exercises.filter((exercise) => exercise.type === "reading")
+    );
+
+    expect(readings).toHaveLength(12);
+    expect(new Set(readings.map((exercise) => exercise.readingText)).size).toBe(12);
+    for (const exercise of readings) {
+      expect(exercise.readingText).toMatch(/\S/);
+      expect(exercise.readingText!.length).toBeGreaterThanOrEqual(12);
+      expect(exercise.readingText).not.toBe(exercise.promptZh);
+    }
+  });
+
+  it("rehearses the added itinerary anchors without specific booking details", () => {
+    const textFor = (id: string) => {
+      const mission = travelMissions.find((item) => item.id === id)!;
+      return [
+        ...mission.productionPhrases.map((phrase) => phrase.english),
+        ...mission.recognitionWords,
+        ...mission.exercises.flatMap((exercise) => exercise.readingText ?? [])
+      ].join(" ").toLowerCase();
+    };
+
+    expect(textFor("hotel-checkin")).toContain("self check-in");
+    expect(textFor("directions-tickets")).toMatch(/vatican.*open|open.*vatican/);
+    expect(textFor("swiss-mountain-transit")).toEqual(expect.stringContaining("lungern"));
+    expect(textFor("swiss-mountain-transit")).toEqual(expect.stringContaining("lucerne"));
+    expect(textFor("swiss-mountain-transit")).toEqual(expect.stringContaining("zurich airport"));
+    expect(textFor("urgent-help")).toEqual(expect.stringContaining("toilet"));
+    expect(textFor("urgent-help")).toEqual(expect.stringContaining("bag"));
   });
 
   it("keeps emergency phrases complete, unique, short, and free of contact details", () => {

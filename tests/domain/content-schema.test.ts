@@ -67,12 +67,33 @@ describe("missionSchema", () => {
         intent: "read", keywords: ["read"], recovery: index === 0
       })),
       recognitionWords: ["read"],
-      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读" }))
+      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE: Read this sign." }))
     };
 
     expect(missionSchema.safeParse({ ...base, kind: "business" }).success).toBe(false);
     expect(missionSchema.safeParse({ ...base, kind: "business", embeddedSession: 8 }).success).toBe(true);
     expect(missionSchema.safeParse({ ...base, kind: "business", embeddedSession: 5 }).success).toBe(false);
     expect(missionSchema.safeParse({ ...base, kind: "travel", embeddedSession: 8 }).success).toBe(false);
+  });
+
+  it("requires real reading text and role-play variation", () => {
+    const exerciseBase = { id: "exercise", promptZh: "练习" };
+    const missionBase = {
+      id: "exercise-check", kind: "travel", titleZh: "练习", city: "Rome",
+      productionPhrases: Array.from({ length: 5 }, (_, index) => ({
+        id: `exercise-phrase-${index}`, english: `Phrase ${index}`, chinese: `短语 ${index}`,
+        intent: "practice", keywords: ["practice"], recovery: index === 0
+      })),
+      recognitionWords: ["notice"]
+    };
+
+    expect(missionSchema.safeParse({
+      ...missionBase,
+      exercises: Array.from({ length: 5 }, (_, index) => ({ ...exerciseBase, id: `reading-${index}`, type: "reading" }))
+    }).success).toBe(false);
+    expect(missionSchema.safeParse({
+      ...missionBase,
+      exercises: Array.from({ length: 5 }, (_, index) => ({ ...exerciseBase, id: `roleplay-${index}`, type: "roleplay" }))
+    }).success).toBe(false);
   });
 });
