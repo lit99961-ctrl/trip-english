@@ -33,7 +33,7 @@ export interface BackupPreview {
   speakingMinutes: number;
 }
 
-export interface PreparedBackupImport {
+interface PreparedBackupImport {
   progress: LearnerProgressV1;
   preview: BackupPreview;
 }
@@ -115,7 +115,15 @@ export async function readBackupText(file: Blob): Promise<string> {
   return file.text();
 }
 
-export async function restorePreparedBackup(
+export async function restoreBackup(
+  repository: ProgressRepository,
+  text: string,
+  confirmation: RestoreConfirmation
+): Promise<RestoreResult> {
+  return restorePreparedBackup(repository, inspectBackupImport(text), confirmation);
+}
+
+async function restorePreparedBackup(
   repository: ProgressRepository,
   prepared: PreparedBackupImport,
   confirmation: RestoreConfirmation

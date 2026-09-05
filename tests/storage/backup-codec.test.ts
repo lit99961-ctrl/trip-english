@@ -9,7 +9,7 @@ import {
   encodeBackup,
   inspectBackupImport,
   readBackupText,
-  restorePreparedBackup
+  restoreBackup
 } from "../../src/storage/backup-codec";
 
 const NodeBlob = (await import("node:buffer" as string)).Blob as typeof Blob;
@@ -114,16 +114,18 @@ describe("safe backup restore", () => {
     await repository.replaceProgress(progressFixture);
     const before = await repository.load();
 
-    expect(() => inspectBackupImport('{"schemaVersion":99}')).toThrow(/unsupported backup/i);
+    await expect(restoreBackup(repository, '{"schemaVersion":99}', true)).rejects.toThrow(
+      /unsupported backup/i
+    );
     await expect(repository.load()).resolves.toEqual(before);
   });
 
   test("cancellation leaves progress unchanged", async () => {
     const repository = createRepository();
     await repository.replaceProgress(progressFixture);
-    const prepared = inspectBackupImport(encodeBackup({ ...progressFixture, activeMissionId: "taxi" }));
+    const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
 
-    await expect(restorePreparedBackup(repository, prepared, false)).resolves.toMatchObject({
+    await expect(restoreBackup(repository, backup, false)).resolves.toMatchObject({
       restored: false,
       reason: "cancelled"
     });
@@ -135,9 +137,9 @@ describe("safe backup restore", () => {
     const recording = new NodeBlob(["recording"], { type: "audio/webm" });
     await repository.replaceProgress({ ...progressFixture, activeMissionId: "airport" });
     await repository.saveRecording("hotel/listen-1", recording);
-    const prepared = inspectBackupImport(encodeBackup(progressFixture));
+    const backup = encodeBackup(progressFixture);
 
-    await expect(restorePreparedBackup(repository, prepared, () => true)).resolves.toMatchObject({
+    await expect(restoreBackup(repository, backup, () => true)).resolves.toMatchObject({
       restored: true,
       progress: progressFixture
     });
@@ -155,29 +157,29 @@ describe("safe backup restore", () => {
 
   test("rolls back exact previous progress when reloading the restored state fails", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
-    const prepared = inspectBackupImport(encodeBackup({ ...progressFixture, activeMissionId: "taxi" }));
+    const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
     repository.failNextLoadAfterReplacement = true;
 
-    await expect(restorePreparedBackup(repository, prepared, true)).rejects.toThrow("reload failed");
+    await expect(restoreBackup(repository, backup, true)).rejects.toThrow("reload failed");
     await expect(repository.load()).resolves.toEqual(progressFixture);
     expect(repository.checkpointPresent).toBe(true);
   });
 
   test("rolls back exact previous progress when replacement fails after mutation", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
-    const prepared = inspectBackupImport(encodeBackup({ ...progressFixture, activeMissionId: "taxi" }));
+    const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
     repository.failNextReplaceAfterMutation = true;
 
-    await expect(restorePreparedBackup(repository, prepared, true)).rejects.toThrow("replace failed");
+    await expect(restoreBackup(repository, backup, true)).rejects.toThrow("replace failed");
     await expect(repository.load()).resolves.toEqual(progressFixture);
     expect(repository.checkpointPresent).toBe(true);
   });
 
   test("clears the restore checkpoint only after a successful reload", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
-    const prepared = inspectBackupImport(encodeBackup({ ...progressFixture, activeMissionId: "taxi" }));
+    const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
 
-    await restorePreparedBackup(repository, prepared, true);
+    await restoreBackup(repository, backup, true);
 
     expect(repository.checkpointPresentWhenRestoredLoad).toBe(true);
     expect(repository.checkpointPresent).toBe(false);
