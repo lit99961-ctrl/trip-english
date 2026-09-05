@@ -31,9 +31,13 @@ describe("itinerary course coverage", () => {
   it("binds every role-play variation to its prompt template", () => {
     for (const exercise of travelMissions.flatMap((mission) => mission.exercises).filter((item) => item.type === "roleplay")) {
       const rendered = renderRoleplayPrompt(exercise.promptTemplate, exercise.variation);
+      const mission = travelMissions.find((item) => item.id === exercise.id.replace(/-roleplay$/, ""))!;
+      const phrase = mission.productionPhrases.find((item) => item.id === exercise.phraseId)!;
       expect(rendered).not.toMatch(/\{[^}]+\}/);
       expect(rendered).not.toBe(exercise.promptTemplate);
       expect(Object.values(exercise.variation).some((value) => rendered.includes(value))).toBe(true);
+      const score = scoreTranscript(rendered, { requiredKeywords: phrase.requiredKeywordGroups });
+      expect(score.passed, `${mission.id}: ${rendered}`).toBe(true);
     }
   });
 
@@ -169,6 +173,17 @@ describe("itinerary course coverage", () => {
     expect(message).toMatch(/cannot|can't/i);
     expect(message).toMatch(/schedule|meeting/i);
     expect(message).toMatch(/next step/i);
+  });
+
+  it("makes reading questions assessable and links personal active cards to practice", () => {
+    for (const exercise of [...travelMissions, ...businessMissions].flatMap((mission) => mission.exercises).filter((item) => item.type === "reading")) {
+      for (const question of exercise.questions) {
+        expect(question.expectedAnswers.some((answer) => exercise.readingText.toLowerCase().includes(answer.toLowerCase()))).toBe(true);
+      }
+    }
+    for (const phrase of businessMissions.flatMap((mission) => mission.productionPhrases).filter((phrase) => phrase.activeTarget)) {
+      expect(businessMissions.some((mission) => mission.exercises.some((exercise) => exercise.phraseId === phrase.id))).toBe(true);
+    }
   });
 
   it("keeps emergency phrases complete, unique, short, and free of contact details", () => {

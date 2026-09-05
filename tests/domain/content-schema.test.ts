@@ -71,7 +71,7 @@ describe("missionSchema", () => {
         intent: "read", keywords: ["read"], requiredKeywordGroups: [["read"]], recovery: index === 0
       })),
       recognitionWords: ["read"],
-      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE: Read this sign." }))
+      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE: Read this sign.", questions: [{ promptZh: "内容？", expectedAnswers: ["NOTICE"] }] }))
     };
 
     expect(missionSchema.safeParse({ ...base, kind: "business" }).success).toBe(false);

@@ -20,7 +20,7 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
       { id: "hotel-shadow", type: "shadow", phraseId: "hotel-name", promptZh: "跟读姓名" },
       { id: "hotel-recall", type: "recall", phraseId: "hotel-room", promptZh: "回忆房间" },
       { id: "hotel-roleplay", type: "roleplay", phraseId: "hotel-key", promptZh: "索要房卡", variation: { keys: "two" }, promptTemplate: "I need {keys} keys." },
-      { id: "hotel-reading", type: "reading", phraseId: "hotel-thanks", promptZh: "朗读致谢", readingText: "HOTEL NOTICE: THANK YOU." }
+      { id: "hotel-reading", type: "reading", phraseId: "hotel-thanks", promptZh: "朗读致谢", readingText: "HOTEL NOTICE: THANK YOU.", questions: [{ promptZh: "写了什么？", expectedAnswers: ["THANK YOU"] }] }
     ],
     ...overrides
   };

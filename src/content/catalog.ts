@@ -50,38 +50,36 @@ export function validateCatalog(candidate: unknown = missionSource): DeepReadonl
 
 const missionSource = [...travelMissions, ...businessMissions];
 
-export const allMissions: DeepReadonly<readonly Mission[]> = deepFreeze(validateCatalog(missionSource));
-
 export interface CourseSession {
   readonly sessionNumber: number;
   readonly travelMission: Mission;
   readonly businessMission?: Mission;
 }
 
-const businessBySession = new Map([[4, businessMissions[0]!], [8, businessMissions[1]!], [11, businessMissions[2]!]]);
-
-export function validateCourseSessions(candidate: unknown): readonly CourseSession[] {
-  const sessions = candidate as CourseSession[];
-  if (!Array.isArray(sessions) || sessions.length !== 12) throw new Error("course requires exactly 12 sessions");
-  const numbers = sessions.map((session) => session.sessionNumber);
-  if (numbers.some((number, index) => number !== index + 1)) throw new Error("course session numbers must be 1 through 12");
-  for (const session of sessions) {
-    if (session.travelMission.kind !== "travel") throw new Error("every session requires one travel mission");
-    const expectedBusiness = businessBySession.get(session.sessionNumber);
-    if (session.businessMission !== expectedBusiness) throw new Error("business missions must be embedded in sessions 4, 8, and 11");
-  }
-  const activeTargets = sessions.flatMap((session) => [session.travelMission, session.businessMission].filter(Boolean).flatMap((mission) => mission!.productionPhrases)).filter((phrase) => phrase.activeTarget);
-  if (activeTargets.length !== 30) throw new Error("course requires exactly 30 active targets");
-  return sessions;
+export interface CourseAssembly {
+  readonly allMissions: readonly Mission[];
+  readonly courseSessions: readonly CourseSession[];
 }
 
-const courseSessionSource = travelMissions.map((travelMission, index) => ({
-  sessionNumber: index + 1,
-  travelMission,
-  businessMission: businessBySession.get(index + 1)
-}));
+const expectedTravelIds = ["hk-checkin", "helsinki-transfer", "rome-arrival", "hotel-checkin", "directions-tickets", "restaurant", "italy-high-speed-rail", "venice-vaporetto", "milan-swiss-transfer", "swiss-mountain-transit", "shopping-tax-refund", "urgent-help"];
+const expectedBusinessSessions = new Map([["email-action", 4], ["internet-headline", 8], ["message-intent", 11]]);
 
-export const courseSessions: DeepReadonly<readonly CourseSession[]> = deepFreeze(validateCourseSessions(courseSessionSource));
+export function assembleCourse(candidate: unknown) {
+  const missions = validateCatalog(candidate);
+  const travel = missions.filter((mission) => mission.kind === "travel");
+  const business = missions.filter((mission) => mission.kind === "business");
+  if (travel.map((mission) => mission.id).join("|") !== expectedTravelIds.join("|")) throw new Error("travel mission order is invalid");
+  if (business.length !== 3 || business.some((mission) => expectedBusinessSessions.get(mission.id) !== mission.embeddedSession)) throw new Error("business session mapping is invalid");
+  const businessBySession = new Map<number, (typeof business)[number]>(business.map((mission) => [mission.embeddedSession, mission]));
+  const sessions = travel.map((travelMission, index) => ({ sessionNumber: index + 1, travelMission, businessMission: businessBySession.get(index + 1) }));
+  const activeTargets = sessions.flatMap((session) => [session.travelMission, session.businessMission].filter(Boolean).flatMap((mission) => mission!.productionPhrases)).filter((phrase) => phrase.activeTarget);
+  if (activeTargets.length !== 30) throw new Error("course requires exactly 30 active targets");
+  return deepFreeze({ allMissions: missions, courseSessions: sessions });
+}
+
+const assembledCourse = assembleCourse(missionSource);
+export const allMissions = assembledCourse.allMissions;
+export const courseSessions = assembledCourse.courseSessions;
 
 /** Consumer-facing twelve-session course. */
 export const catalog = courseSessions;

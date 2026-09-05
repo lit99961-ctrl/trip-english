@@ -24,7 +24,7 @@ const exerciseSchema = z.discriminatedUnion("type", [
       context.addIssue({ code: "custom", message: "roleplay variation keys must match promptTemplate placeholders" });
     }
   }),
-  z.object({ id: z.string(), type: z.literal("reading"), phraseId: z.string().optional(), promptZh: z.string().min(1), readingText: z.string().min(1) }).strict()
+  z.object({ id: z.string(), type: z.literal("reading"), phraseId: z.string().optional(), promptZh: z.string().min(1), readingText: z.string().min(1), questions: z.array(z.object({ promptZh: z.string().min(1), expectedAnswers: z.array(z.string().min(1)).min(1) })).min(1) }).strict()
 ]);
 
 const missionFields = {
