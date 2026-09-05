@@ -8,11 +8,11 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
     titleZh: "入住酒店",
     city: "Milan",
     productionPhrases: [
-      { id: "hotel-check-in", english: "I have a reservation.", chinese: "我有预订。", intent: "check-in", keywords: ["reservation"], recovery: true },
-      { id: "hotel-name", english: "My name is Li.", chinese: "我叫李。", intent: "identify", keywords: ["name"] },
-      { id: "hotel-room", english: "I need a room.", chinese: "我需要一个房间。", intent: "request-room", keywords: ["room"] },
-      { id: "hotel-key", english: "Could I have my key?", chinese: "我可以拿房卡吗？", intent: "request-key", keywords: ["key"] },
-      { id: "hotel-thanks", english: "Thank you.", chinese: "谢谢。", intent: "thanks", keywords: ["thank"] }
+      { id: "hotel-check-in", english: "I have a reservation.", chinese: "我有预订。", intent: "check-in", keywords: ["reservation"], requiredKeywordGroups: [["reservation"]], recovery: true },
+      { id: "hotel-name", english: "My name is Li.", chinese: "我叫李。", intent: "identify", keywords: ["name"], requiredKeywordGroups: [["name"]] },
+      { id: "hotel-room", english: "I need a room.", chinese: "我需要一个房间。", intent: "request-room", keywords: ["room"], requiredKeywordGroups: [["room"]] },
+      { id: "hotel-key", english: "Could I have my key?", chinese: "我可以拿房卡吗？", intent: "request-key", keywords: ["key"], requiredKeywordGroups: [["key"]] },
+      { id: "hotel-thanks", english: "Thank you.", chinese: "谢谢。", intent: "thanks", keywords: ["thank"], requiredKeywordGroups: [["thank"]] }
     ],
     recognitionWords: ["reservation"],
     exercises: [

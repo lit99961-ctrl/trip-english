@@ -20,6 +20,7 @@ describe("missionSchema", () => {
         chinese: `短语 ${index}`,
         intent: "request",
         keywords: ["phrase"],
+        requiredKeywordGroups: [["phrase"]],
         recovery: false
       })),
       recognitionWords: ["hotel"],
@@ -53,18 +54,21 @@ describe("missionSchema", () => {
   });
 
   it("retains active targets and requires business embedded-session metadata", () => {
+    expect(phraseSchema.safeParse({
+      id: "missing-groups", english: "I need help.", chinese: "我需要帮助。", intent: "help", keywords: ["help"]
+    }).success).toBe(false);
     expect(phraseSchema.parse({
-      id: "target", english: "I need help.", chinese: "我需要帮助。", intent: "help", keywords: ["help"]
+      id: "target", english: "I need help.", chinese: "我需要帮助。", intent: "help", keywords: ["help"], requiredKeywordGroups: [["help"]]
     }).activeTarget).toBe(false);
     expect(phraseSchema.parse({
-      id: "active-target", english: "I need help.", chinese: "我需要帮助。", intent: "help", keywords: ["help"], activeTarget: true
+      id: "active-target", english: "I need help.", chinese: "我需要帮助。", intent: "help", keywords: ["help"], requiredKeywordGroups: [["help"]], activeTarget: true
     }).activeTarget).toBe(true);
 
     const base = {
       id: "reading", titleZh: "阅读", city: "Reading practice",
       productionPhrases: Array.from({ length: 5 }, (_, index) => ({
         id: `reading-${index}`, english: `Phrase ${index}`, chinese: `短语 ${index}`,
-        intent: "read", keywords: ["read"], recovery: index === 0
+        intent: "read", keywords: ["read"], requiredKeywordGroups: [["read"]], recovery: index === 0
       })),
       recognitionWords: ["read"],
       exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE: Read this sign." }))
@@ -82,7 +86,7 @@ describe("missionSchema", () => {
       id: "exercise-check", kind: "travel", titleZh: "练习", city: "Rome",
       productionPhrases: Array.from({ length: 5 }, (_, index) => ({
         id: `exercise-phrase-${index}`, english: `Phrase ${index}`, chinese: `短语 ${index}`,
-        intent: "practice", keywords: ["practice"], recovery: index === 0
+        intent: "practice", keywords: ["practice"], requiredKeywordGroups: [["practice"]], recovery: index === 0
       })),
       recognitionWords: ["notice"]
     };
@@ -105,7 +109,7 @@ describe("missionSchema", () => {
     const base = {
       id: "strict-exercises", kind: "travel", titleZh: "练习", city: "Rome",
       productionPhrases: Array.from({ length: 5 }, (_, index) => ({
-        id: `strict-${index}`, english: `Phrase ${index}`, chinese: `短语 ${index}`, intent: "practice", keywords: ["phrase"], recovery: index === 0
+        id: `strict-${index}`, english: `Phrase ${index}`, chinese: `短语 ${index}`, intent: "practice", keywords: ["phrase"], requiredKeywordGroups: [["phrase"]], recovery: index === 0
       })), recognitionWords: ["notice"]
     };
     expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE", variation: { item: "x" } })) }).success).toBe(false);

@@ -10,7 +10,7 @@ export const phraseSchema = z.object({
   audio: z.string().startsWith("/audio/").optional(),
   recovery: z.boolean().default(false),
   activeTarget: z.boolean().default(false),
-  requiredKeywordGroups: z.array(z.array(z.string().min(1)).min(1)).min(1).default([])
+  requiredKeywordGroups: z.array(z.array(z.string().min(1)).min(1)).min(1)
 });
 
 const exerciseSchema = z.discriminatedUnion("type", [
