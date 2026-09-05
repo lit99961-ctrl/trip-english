@@ -1,0 +1,10 @@
+:root {
+  --paper: #f8f0df;
+  --ink: #173c34;
+  --accent: #d34f3d;
+  --surface: #fffaf1;
+  --line: #dfd0b1;
+  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
