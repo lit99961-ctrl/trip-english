@@ -4,21 +4,23 @@ export type AttemptActivity = "production" | "choice";
 
 /** A normalized, production-relevant learner attempt. */
 export interface Attempt {
+  attemptId?: string | undefined;
   supportLevel: SupportLevel;
   passed: boolean;
   answerRevealed: boolean;
-  hintCount?: number;
-  timestamp?: string;
-  activity?: AttemptActivity;
+  hintCount?: number | undefined;
+  timestamp?: string | undefined;
+  activity?: AttemptActivity | undefined;
 }
 
 export interface AttemptInput {
+  attemptId?: string | undefined;
   supportLevel?: SupportLevel;
   passed: boolean;
   answerRevealed: boolean;
-  hintCount?: number;
-  timestamp?: string;
-  activity?: AttemptActivity;
+  hintCount?: number | undefined;
+  timestamp?: string | undefined;
+  activity?: AttemptActivity | undefined;
   /** Prior attempts for this phrase; the current attempt is appended internally. */
   history?: readonly Attempt[];
 }
@@ -44,6 +46,7 @@ function normalizeAttempt(input: AttemptInput): Attempt {
   assertHintCount(input.hintCount);
   const hintCount = input.hintCount ?? 0;
   return {
+    ...(input.attemptId === undefined ? {} : { attemptId: input.attemptId }),
     supportLevel: input.supportLevel ?? (input.answerRevealed ? "full" : hintCount > 0 ? "partial" : "english"),
     passed: input.passed,
     answerRevealed: input.answerRevealed,

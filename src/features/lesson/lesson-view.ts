@@ -31,6 +31,7 @@ export interface LessonViewOptions {
   onComplete?: () => void;
   createObjectURL?: (recording: Blob) => string;
   revokeObjectURL?: (url: string) => void;
+  createAttemptId?: () => string;
 }
 
 const stageMap = "active-review comprehension supported-speaking prompt-free-role-play reading-close";
@@ -103,6 +104,7 @@ function restoreAttempts(
     phraseId,
     history.map((attempt) => ({
       supportLevel: attempt.supportLevel,
+      ...(attempt.attemptId === undefined ? {} : { attemptId: attempt.attemptId }),
       passed: attempt.passed,
       answerRevealed: attempt.answerRevealed,
       ...(attempt.hintCount === undefined ? {} : { hintCount: attempt.hintCount }),
@@ -133,6 +135,7 @@ function defaultNavigation(root: HTMLElement): void {
 export function renderLesson(options: LessonViewOptions): LessonView {
   const { mission, progress, speech, persistence } = options;
   const now = options.now ?? Date.now;
+  const createAttemptId = options.createAttemptId ?? (() => crypto.randomUUID());
   const definition: LessonDefinition = {
     exerciseIds: mission.exercises.map((exercise) => exercise.id),
     phraseIds: mission.productionPhrases.map((phrase) => phrase.id)
@@ -298,6 +301,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           let candidateClass: AttemptClass | undefined;
           if (phrase) {
             candidateState = recordPhraseAttempt(definition, state, phrase.id, {
+              attemptId: createAttemptId(),
               passed: selected.value === "recalled",
               answerRevealed: true,
               supportLevel: "full",
@@ -335,6 +339,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         let candidateClass: AttemptClass | undefined;
         if (phrase) {
           candidateState = recordPhraseAttempt(definition, state, phrase.id, {
+            attemptId: createAttemptId(),
             passed: selected.value === "answer",
             answerRevealed: true,
             supportLevel: "full",
@@ -390,6 +395,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           let candidateClass: AttemptClass | undefined;
           if (phrase) {
             candidateState = recordPhraseAttempt(definition, state, phrase.id, {
+              attemptId: createAttemptId(),
               passed: readingPassed,
               answerRevealed: !readingPassed,
               supportLevel: "english",
@@ -515,6 +521,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           let candidateClass: AttemptClass | undefined;
           if (phrase) {
             candidateState = recordPhraseAttempt(definition, state, phrase.id, {
+              attemptId: createAttemptId(),
               passed,
               answerRevealed: false,
               supportLevel: support,

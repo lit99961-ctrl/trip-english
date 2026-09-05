@@ -96,11 +96,29 @@ export function renderCalibration(options: CalibrationOptions): CalibrationView 
   let recording: RecordingSession | undefined;
   let recordingStartedAt = 0;
   let recordingResult: Blob | undefined;
+  let recordingKey: string | undefined;
   let recordingUrl: string | undefined;
   const recordingKeys: string[] = [];
   let disposed = false;
   let saveError: string | undefined;
-  let speakingPhase: "idle" | "recording" | "rating" = "idle";
+  let recordingSaveError: string | undefined;
+  let speakingPhase: "idle" | "recording" | "save-error" | "rating" = "idle";
+
+  const appendRecordingPlayback = (message: string): void => {
+    const help = document.createElement("p");
+    help.textContent = message;
+    root.append(help);
+    if (!recordingResult) return;
+    const audio = document.createElement("audio");
+    audio.controls = true;
+    audio.setAttribute("aria-label", "回听刚才的校准录音");
+    const createObjectURL = options.createObjectURL ?? URL.createObjectURL?.bind(URL);
+    if (createObjectURL) {
+      recordingUrl = createObjectURL(recordingResult);
+      audio.src = recordingUrl;
+    }
+    root.append(audio);
+  };
 
   const render = (): void => {
     if (disposed) return;
@@ -193,32 +211,46 @@ export function renderCalibration(options: CalibrationOptions): CalibrationView 
           const stoppedAt = now();
           try {
             recordingResult = await recording!.stop();
+            recording = undefined;
             speakingMilliseconds += Math.max(0, stoppedAt - recordingStartedAt);
-            const recordingKey = `baseline/speaking-${index - 3}`;
-            await options.store.saveRecording(recordingKey, recordingResult);
-            recordingKeys.push(recordingKey);
           } catch {
             recordingResult = undefined;
+            recording = undefined;
+            speakingPhase = "rating";
+            render();
+            return;
           }
-          speakingPhase = "rating";
+          recordingKey = `baseline/speaking-${index - 3}`;
+          try {
+            await options.store.saveRecording(recordingKey, recordingResult);
+            recordingKeys.push(recordingKey);
+            recordingSaveError = undefined;
+            speakingPhase = "rating";
+          } catch {
+            recordingSaveError = "录音未保存，但录音仍可回听。请重试保存。";
+            speakingPhase = "save-error";
+          }
+          render();
+        });
+      } else if (speakingPhase === "save-error") {
+        appendRecordingPlayback(recordingSaveError ?? "录音未保存，请重试。");
+        primary.textContent = "重试保存录音";
+        primary.addEventListener("click", async () => {
+          primary.disabled = true;
+          try {
+            await options.store.saveRecording(recordingKey!, recordingResult!);
+            if (!recordingKeys.includes(recordingKey!)) recordingKeys.push(recordingKey!);
+            recordingSaveError = undefined;
+            speakingPhase = "rating";
+          } catch {
+            recordingSaveError = "录音仍未保存，请检查存储空间后重试。";
+          }
           render();
         });
       } else {
-        const help = document.createElement("p");
-        help.textContent = recordingResult ? "回听后按真实感受选择。" : "麦克风不可用，也可以先无声练习。";
-        if (recordingResult) {
-          const audio = document.createElement("audio");
-          audio.controls = true;
-          audio.setAttribute("aria-label", "回听刚才的校准录音");
-          const createObjectURL = options.createObjectURL ?? URL.createObjectURL?.bind(URL);
-          if (createObjectURL) {
-            recordingUrl = createObjectURL(recordingResult);
-            audio.src = recordingUrl;
-          }
-          root.append(help, audio);
-        } else {
-          root.append(help);
-        }
+        appendRecordingPlayback(
+          recordingResult ? "回听后按真实感受选择。" : "麦克风不可用，也可以先无声练习。"
+        );
         const rating = choiceField(["smooth", "retry"], `calibration-rating-${index}`);
         for (const label of rating.querySelectorAll("label")) {
           if (label.textContent === "smooth") label.lastChild!.textContent = "说顺了";
@@ -262,6 +294,7 @@ export function renderCalibration(options: CalibrationOptions): CalibrationView 
           speakingPhase = "idle";
           recording = undefined;
           recordingResult = undefined;
+          recordingKey = undefined;
           saveError = undefined;
           render();
         });

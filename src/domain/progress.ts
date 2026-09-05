@@ -3,6 +3,7 @@ import { z } from "zod";
 const isoDateTime = z.string().datetime({ offset: true });
 
 const attemptSchema = z.object({
+  attemptId: z.string().min(1).optional(),
   supportLevel: z.enum(["full", "english", "partial", "prompt-only"]),
   passed: z.boolean(),
   answerRevealed: z.boolean(),

@@ -220,6 +220,113 @@ describe("IndexedDbProgressRepository", () => {
     });
   });
 
+  test("does not let a stale writer roll back completed work or delete attempts", async () => {
+    const repository = createRepository();
+    const secondRepository = new IndexedDbProgressRepository(databaseNames[0]);
+    repositories.push(secondRepository);
+    await secondRepository.load(); // This instance now represents an older open lesson view.
+    const supportedAttempt = {
+      attemptId: "attempt-a",
+      supportLevel: "full" as const,
+      passed: true,
+      answerRevealed: true,
+      activity: "production" as const
+    };
+    const independentAttempt = {
+      attemptId: "attempt-b",
+      supportLevel: "prompt-only" as const,
+      passed: true,
+      answerRevealed: false,
+      activity: "production" as const
+    };
+    const staleNewAttempt = {
+      attemptId: "attempt-c",
+      supportLevel: "english" as const,
+      passed: true,
+      answerRevealed: false,
+      activity: "production" as const
+    };
+
+    await repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: { reservation: [supportedAttempt] },
+        phraseClasses: { reservation: "practiced" }
+      },
+      speakingSeconds: 3
+    });
+    await repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e2",
+      lessonState: {
+        completedExerciseIds: ["e1", "e2"],
+        phraseAttempts: { reservation: [supportedAttempt, independentAttempt] },
+        phraseClasses: { reservation: "recalled" }
+      },
+      speakingSeconds: 8
+    });
+    await secondRepository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: { reservation: [supportedAttempt, staleNewAttempt] },
+        phraseClasses: { reservation: "introduced" }
+      },
+      speakingSeconds: 3
+    });
+
+    const stored = await repository.load();
+    expect(stored.sessions.hotel!.completedExerciseIds).toEqual(["e1", "e2"]);
+    expect(stored.sessions.hotel!.phraseAttempts!.reservation!.map((attempt) => attempt.attemptId))
+      .toEqual(["attempt-a", "attempt-b", "attempt-c"]);
+    expect(stored.sessions.hotel!.phraseClasses!.reservation).toBe("mastered");
+    expect(stored.speakingSeconds).toBe(8);
+  });
+
+  test("rejects a full-state write that skips an unseen completion event", async () => {
+    const repository = createRepository();
+
+    await expect(repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e2",
+      lessonState: {
+        completedExerciseIds: ["e1", "e2"],
+        phraseAttempts: {},
+        phraseClasses: {}
+      }
+    })).rejects.toThrow("completion event");
+
+    await expect(repository.load()).resolves.toMatchObject({ sessions: {} });
+  });
+
+  test("derives phrase class from attempts instead of trusting a forged mastered class", async () => {
+    const repository = createRepository();
+
+    await repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "e1",
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: {
+          reservation: [{
+            attemptId: "single-supported",
+            supportLevel: "full",
+            passed: true,
+            answerRevealed: true,
+            activity: "production"
+          }]
+        },
+        phraseClasses: { reservation: "mastered" }
+      }
+    });
+
+    const stored = await repository.load();
+    expect(stored.sessions.hotel!.phraseClasses!.reservation).toBe("practiced");
+  });
+
   test("reset clears progress and recordings while leaving the repository usable", async () => {
     const repository = createRepository();
     await repository.saveExerciseResult({ missionId: "hotel", exerciseId: "listen-1" });

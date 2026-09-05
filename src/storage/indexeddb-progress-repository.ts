@@ -1,5 +1,11 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import {
+  canMaster,
+  classifyAttempt,
+  type Attempt,
+  type AttemptClass
+} from "../domain/lesson-engine";
+import {
   createLearnerProgressV1,
   migrateProgress,
   type LearnerProgressV1
@@ -77,13 +83,19 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       missionId: input.missionId,
       completedExerciseIds: []
     };
-    const completedExerciseIds = input.lessonState?.completedExerciseIds
+    const incomingCompletedIds = input.lessonState?.completedExerciseIds
       ?? (session.completedExerciseIds.includes(input.exerciseId)
-      ? session.completedExerciseIds
-      : [...session.completedExerciseIds, input.exerciseId]);
+        ? session.completedExerciseIds
+        : [...session.completedExerciseIds, input.exerciseId]);
+    const completedExerciseIds = input.lessonState
+      ? mergeCompletionEvent(session.completedExerciseIds, incomingCompletedIds, input.exerciseId)
+      : [...incomingCompletedIds];
     if (!completedExerciseIds.includes(input.exerciseId)) {
       throw new Error("lessonState must include the completed exercise");
     }
+    const phraseAttempts = input.lessonState === undefined
+      ? session.phraseAttempts
+      : mergeAttemptRecords(session.phraseAttempts, input.lessonState.phraseAttempts);
     const nextProgress: LearnerProgressV1 = {
       ...progress,
       activeMissionId: input.missionId,
@@ -95,9 +107,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
         [input.missionId]: {
           ...session,
           completedExerciseIds,
-          ...(input.lessonState === undefined ? {} : {
-            phraseAttempts: input.lessonState.phraseAttempts,
-            phraseClasses: input.lessonState.phraseClasses
+          ...(phraseAttempts === undefined ? {} : {
+            phraseAttempts,
+            phraseClasses: derivePhraseClasses(phraseAttempts)
           })
         }
       }
@@ -268,4 +280,79 @@ function stableJson(value: unknown): string {
       .join(",")}}`;
   }
   return JSON.stringify(value) ?? "null";
+}
+
+function isPrefix(prefix: readonly string[], candidate: readonly string[]): boolean {
+  return prefix.every((value, index) => candidate[index] === value);
+}
+
+function mergeCompletionEvent(
+  current: readonly string[],
+  incoming: readonly string[],
+  exerciseId: string
+): string[] {
+  if (incoming.at(-1) !== exerciseId) {
+    throw new Error("lessonState must end with its completion event");
+  }
+  const previous = incoming.slice(0, -1);
+  if (previous.length === current.length && isPrefix(previous, current)) return [...incoming];
+  if (isPrefix(previous, current) && current[previous.length] === exerciseId) return [...current];
+  throw new Error("completion event does not follow stored authored order");
+}
+
+function attemptsEqual(left: Attempt, right: Attempt): boolean {
+  return stableJson(left) === stableJson(right);
+}
+
+function mergeAttemptRecords(
+  current: Record<string, Attempt[]> | undefined,
+  incoming: Record<string, Attempt[]>
+): Record<string, Attempt[]> {
+  const merged: Record<string, Attempt[]> = {};
+  const phraseIds = new Set([...Object.keys(current ?? {}), ...Object.keys(incoming)]);
+
+  for (const phraseId of phraseIds) {
+    const currentHistory = [...(current?.[phraseId] ?? [])];
+    const result = [...currentHistory];
+    const seenAttemptIds = new Set(
+      currentHistory.flatMap((attempt) => attempt.attemptId ? [attempt.attemptId] : [])
+    );
+    for (const [index, attempt] of (incoming[phraseId] ?? []).entries()) {
+      if (attempt.attemptId) {
+        if (seenAttemptIds.has(attempt.attemptId)) continue;
+        seenAttemptIds.add(attempt.attemptId);
+        result.push(attempt);
+      } else if (!currentHistory[index] || !attemptsEqual(currentHistory[index], attempt)) {
+        result.push(attempt);
+      }
+    }
+    merged[phraseId] = result;
+  }
+  return merged;
+}
+
+function derivePhraseClasses(
+  attemptsByPhrase: Record<string, Attempt[]>
+): Record<string, AttemptClass> {
+  const classes: Record<string, AttemptClass> = {};
+  const rank: Record<AttemptClass, number> = {
+    introduced: 0,
+    practiced: 1,
+    recalled: 2,
+    mastered: 3
+  };
+  for (const [phraseId, history] of Object.entries(attemptsByPhrase)) {
+    if (history.length === 0) continue;
+    if (canMaster(history)) {
+      classes[phraseId] = "mastered";
+      continue;
+    }
+    let derived: AttemptClass = "introduced";
+    history.forEach((attempt, index) => {
+      const candidate = classifyAttempt({ ...attempt, history: history.slice(0, index) });
+      if (rank[candidate] > rank[derived]) derived = candidate;
+    });
+    classes[phraseId] = derived;
+  }
+  return classes;
 }

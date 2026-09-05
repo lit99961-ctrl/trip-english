@@ -181,6 +181,40 @@ describe("two-minute calibration", () => {
     expect(primaryButton(view).disabled).toBe(false);
     expect(view.textContent).not.toContain("起始提示级别");
   });
+
+  it("keeps a successful recording for listen-back and retries storage with the same key", async () => {
+    const saveRecording = vi.fn()
+      .mockRejectedValueOnce(new Error("quota"))
+      .mockResolvedValueOnce(undefined);
+    const saveCalibrationResult = vi.fn();
+    const view = renderCalibration({
+      speech: speechFixture(),
+      store: { saveCalibrationResult, saveRecording },
+      createObjectURL: () => "blob:retry",
+      revokeObjectURL: vi.fn()
+    });
+    document.body.append(view);
+    await clickPrimary(view);
+    for (let index = 0; index < 4; index += 1) {
+      chooseFirst(view);
+      await clickPrimary(view);
+    }
+    await clickPrimary(view);
+    await clickPrimary(view);
+
+    expect(view.textContent).toContain("录音未保存");
+    expect(view.querySelector("audio")?.getAttribute("src")).toBe("blob:retry");
+    expect(primaryButton(view).textContent).toContain("重试");
+    expect(saveCalibrationResult).not.toHaveBeenCalled();
+    const firstCall = saveRecording.mock.calls[0]!;
+
+    await clickPrimary(view);
+
+    expect(saveRecording).toHaveBeenCalledTimes(2);
+    expect(saveRecording.mock.calls[1]![0]).toBe(firstCall[0]);
+    expect(saveRecording.mock.calls[1]![1]).toBe(firstCall[1]);
+    expect(view.textContent).toContain("说顺了");
+  });
 });
 
 function primaryButton(view: HTMLElement): HTMLButtonElement {
