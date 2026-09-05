@@ -34,7 +34,7 @@ function readDictionary(): DictionaryEntry[] {
 
 function normalizeEnglishWords(text: string): string[] {
   const normalized = text.normalize("NFKC").replace(/[\u2018\u2019]/gu, "'").toLowerCase();
-  return normalized.match(/[\p{L}]+(?:['-][\p{L}]+)*/gu) ?? [];
+  return normalized.match(/(?<![\p{L}\p{N}])[\p{L}]+(?:['-][\p{L}]+)*(?![\p{L}\p{N}])/gu) ?? [];
 }
 
 function displayedEnglishWords(): string[] {
@@ -54,7 +54,7 @@ function displayedEnglishWords(): string[] {
     }
   }
   displayedText.push(...emergencyPhrases.map((phrase) => phrase.english));
-  return [...new Set(displayedText.flatMap(normalizeEnglishWords).filter((word) => word.length > 1))].sort();
+  return [...new Set(displayedText.flatMap(normalizeEnglishWords))].sort();
 }
 
 function listAiffFiles(path: string): string[] {
@@ -66,6 +66,16 @@ function listAiffFiles(path: string): string[] {
   } catch {
     return [];
   }
+}
+
+function aiffChunkIds(bytes: Buffer): string[] {
+  const chunks: string[] = [];
+  for (let offset = 12; offset + 8 <= bytes.length;) {
+    chunks.push(bytes.subarray(offset, offset + 4).toString("ascii"));
+    const size = bytes.readUInt32BE(offset + 4);
+    offset += 8 + size + (size % 2);
+  }
+  return chunks;
 }
 
 describe("generated offline dictionary", () => {
@@ -139,6 +149,25 @@ describe("generated offline dictionary", () => {
     expect(dictionary.get("termini")?.phonetic).toBe("/ˈtɛr.mi.ni/");
   });
 
+  it("keeps visible single-letter words and labels as lowercase contextual entries", () => {
+    const dictionary = new Map(readDictionary().map((entry) => [entry.word, entry]));
+    expect(dictionary.get("i")).toMatchObject({ word: "i", chinese: "我" });
+    expect(dictionary.get("a")).toMatchObject({ word: "a", chinese: "一个；一（不定冠词）" });
+    expect(dictionary.get("b")).toMatchObject({ word: "b", chinese: "B（区域、入口或站台等位置标签）" });
+    for (const word of ["i", "a", "b"]) {
+      expect(dictionary.get(word)?.tags, word).toEqual(expect.arrayContaining(["catalog", "context", "manual"]));
+    }
+
+    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/build-dictionary.mjs")).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+      import { normalizeEnglishWords } from ${JSON.stringify(moduleUrl)};
+      const actual = normalizeEnglishWords("I need a ticket at entrance B, seat 12A.");
+      const expected = ["i", "need", "a", "ticket", "at", "entrance", "b", "seat"];
+      if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(JSON.stringify(actual));
+    `], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it("pins ECDICT and records its license and transformation", () => {
     const script = readText(join(projectRoot, "scripts/build-dictionary.mjs"));
     const notice = readText(join(projectRoot, "THIRD_PARTY_NOTICES.md"));
@@ -148,6 +177,11 @@ describe("generated offline dictionary", () => {
     expect(notice).toContain(pinnedSha);
     expect(notice).toMatch(/MIT/i);
     expect(notice).toMatch(/transform/i);
+    expect(notice).toContain("Copyright (c) 2025 Linwei");
+    expect(notice).toContain("Permission is hereby granted, free of charge, to any person obtaining a copy");
+    expect(notice).toContain("The above copyright notice and this permission notice shall be included in all");
+    expect(notice).toContain("THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR");
+    expect(notice).toContain("OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.");
   });
 
   it("rejects any dictionary source URL other than the exact pinned revision", () => {
@@ -157,6 +191,56 @@ describe("generated offline dictionary", () => {
     ], { encoding: "utf8" });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(pinnedSha);
+  });
+
+  it("times out stalled ECDICT downloads with a clear error", () => {
+    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/build-dictionary.mjs")).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+      import { readEcdict } from ${JSON.stringify(moduleUrl)};
+      const stalledFetch = async (_url, { signal }) => {
+        let streamController;
+        const body = new ReadableStream({ start(controller) { streamController = controller; } });
+        signal.addEventListener("abort", () => streamController.error(Object.assign(new Error("body aborted"), { name: "AbortError" })));
+        return { ok: true, status: 200, statusText: "OK", body };
+      };
+      try { await readEcdict(new Set(), { fetchImpl: stalledFetch, timeoutMs: 5 }); }
+      catch (error) { if (/timed out.*5 ms/i.test(String(error))) process.exit(0); throw error; }
+      throw new Error("stalled download did not time out");
+    `], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it("propagates ECDICT response stream errors", () => {
+    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/build-dictionary.mjs")).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+      import { readEcdict } from ${JSON.stringify(moduleUrl)};
+      const brokenFetch = async () => ({
+        ok: true, status: 200, statusText: "OK",
+        body: new ReadableStream({ start(controller) { controller.error(new Error("stream boom")); } })
+      });
+      try { await readEcdict(new Set(), { fetchImpl: brokenFetch, timeoutMs: 1000 }); }
+      catch (error) { if (String(error).includes("stream boom")) process.exit(0); throw error; }
+      throw new Error("broken response stream was accepted");
+    `], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it("preserves an existing dictionary when atomic serialization fails", () => {
+    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/build-dictionary.mjs")).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+      import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+      import { tmpdir } from "node:os";
+      import { join } from "node:path";
+      import { writeStableJson } from ${JSON.stringify(moduleUrl)};
+      const directory = await mkdtemp(join(tmpdir(), "dictionary-atomic-"));
+      const target = join(directory, "dictionary.json");
+      await writeFile(target, "old dictionary\\n");
+      try { await writeStableJson([{ unsupported: 1n }], target); } catch {}
+      const after = await readFile(target, "utf8");
+      await rm(directory, { recursive: true });
+      if (after !== "old dictionary\\n") throw new Error("existing dictionary was changed");
+    `], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it("selects the same ranked dictionary regardless of source insertion order", () => {
@@ -205,6 +289,21 @@ describe("fixed audio assets", () => {
     expect(result.stderr).toMatch(/collision/i);
   });
 
+  it("makes the generator reject FORM shells without required AIFF chunks", () => {
+    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/generate-fixed-audio.mjs")).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+      import { validateAiffBytes } from ${JSON.stringify(moduleUrl)};
+      const bytes = Buffer.alloc(20);
+      bytes.write("FORM", 0, "ascii");
+      bytes.write("AIFF", 8, "ascii");
+      bytes.write("JUNK", 12, "ascii");
+      try { validateAiffBytes(bytes, "fake.aiff"); }
+      catch (error) { if (String(error).includes("COMM")) process.exit(0); throw error; }
+      throw new Error("invalid AIFF was accepted");
+    `], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it("uses 150 unique safe IDs and paths backed by nonempty AIFF files", () => {
     const phrases = [
       ...allMissions.flatMap((mission) => mission.productionPhrases),
@@ -218,7 +317,10 @@ describe("fixed audio assets", () => {
       expect(audioPath).toMatch(/^\/audio\/(?:phrases|emergency)\/[a-z0-9]+(?:-[a-z0-9]+)*\.aiff$/);
       const absolutePath = join(projectRoot, "public", audioPath!.slice(1));
       expect(statSync(absolutePath).size, audioPath).toBeGreaterThan(12);
-      expect(readFileSync(absolutePath).subarray(0, 4).toString("ascii"), audioPath).toBe("FORM");
+      const bytes = readFileSync(absolutePath);
+      expect(bytes.subarray(0, 4).toString("ascii"), audioPath).toBe("FORM");
+      expect(bytes.subarray(8, 12).toString("ascii"), audioPath).toBe("AIFF");
+      expect(aiffChunkIds(bytes), audioPath).toEqual(expect.arrayContaining(["COMM", "SSND"]));
     }
   });
 

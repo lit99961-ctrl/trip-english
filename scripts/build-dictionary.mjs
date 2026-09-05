@@ -2,6 +2,7 @@ import { createWriteStream } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { parse } from "csv-parse";
 import { createServer } from "vite";
@@ -10,6 +11,7 @@ export const ECDICT_COMMIT = "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b";
 export const ECDICT_SOURCE_URL = "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv";
 const EXPECTED_COLUMNS = ["word", "phonetic", "definition", "translation", "pos", "collins", "oxford", "tag", "bnc", "frq", "exchange", "detail", "audio"];
 const OUTPUT_SIZE = 1000;
+const DOWNLOAD_TIMEOUT_MS = 30_000;
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outputPath = join(projectRoot, "src/content/dictionary.generated.json");
 
@@ -47,6 +49,12 @@ const contextProperNameOverrides = new Map(Object.entries({
   "zurich": properName("苏黎世（瑞士城市）")
 }));
 
+const contextTokenOverrides = new Map(Object.entries({
+  "a": { chinese: "一个；一（不定冠词）", phonetic: "/ə; eɪ/", tags: ["article"] },
+  "b": { chinese: "B（区域、入口或站台等位置标签）", phonetic: "/biː/", tags: ["label"] },
+  "i": { chinese: "我", phonetic: "/aɪ/", tags: ["pronoun"] }
+}));
+
 // Catalog variants without a usable pinned ECDICT translation fall back here.
 const manualFallbackOverrides = new Map(Object.entries({
   "can't": "不能；无法",
@@ -62,7 +70,7 @@ export function assertPinnedSourceUrl(url) {
 
 export function normalizeEnglishWords(text) {
   const normalized = text.normalize("NFKC").replace(/[\u2018\u2019]/gu, "'").toLowerCase();
-  return normalized.match(/[\p{L}]+(?:['-][\p{L}]+)*/gu) ?? [];
+  return normalized.match(/(?<![\p{L}\p{N}])[\p{L}]+(?:['-][\p{L}]+)*(?![\p{L}\p{N}])/gu) ?? [];
 }
 
 function normalizedWord(value) {
@@ -106,9 +114,7 @@ async function loadCatalogWords() {
   const server = await createServer({ root: projectRoot, logLevel: "error", server: { middlewareMode: true }, appType: "custom" });
   try {
     const displayedModule = await server.ssrLoadModule("/src/content/displayed-english.ts");
-    return new Set(displayedModule.displayedEnglish
-      .flatMap(normalizeEnglishWords)
-      .filter((word) => word.length > 1));
+    return new Set(displayedModule.displayedEnglish.flatMap(normalizeEnglishWords));
   } finally {
     await server.close();
   }
@@ -119,44 +125,67 @@ function assertHeader(columns) {
   if (missing.length > 0) throw new Error(`malformed ECDICT header; missing columns: ${missing.join(", ")}`);
 }
 
-async function readEcdict(catalogWords) {
+export async function readEcdict(catalogWords, options = {}) {
+  const { fetchImpl = fetch, timeoutMs = DOWNLOAD_TIMEOUT_MS } = options;
   assertPinnedSourceUrl(ECDICT_SOURCE_URL);
-  const response = await fetch(ECDICT_SOURCE_URL);
-  if (!response.ok) throw new Error(`ECDICT download failed: HTTP ${response.status} ${response.statusText}`);
-  if (response.body === null) throw new Error("ECDICT download failed: response body is empty");
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error(`invalid ECDICT timeout: ${timeoutMs}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    let response;
+    try {
+      response = await fetchImpl(ECDICT_SOURCE_URL, { signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error(`ECDICT download timed out after ${timeoutMs} ms`, { cause: error });
+      throw new Error(`ECDICT download failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    }
+    if (!response.ok) throw new Error(`ECDICT download failed: HTTP ${response.status} ${response.statusText}`);
+    if (response.body === null) throw new Error("ECDICT download failed: response body is empty");
 
-  let checkedHeader = false;
-  const catalogEntries = new Map();
-  const fillerEntries = new Map();
-  const parser = parse({
-    bom: true,
-    columns(header) {
-      const normalized = header.map((column) => column.trim().toLowerCase());
-      assertHeader(normalized);
-      checkedHeader = true;
-      return normalized;
-    },
-    relax_quotes: true,
-    relax_column_count: true,
-    skip_empty_lines: true
-  });
-  Readable.fromWeb(response.body).pipe(parser);
-
-  for await (const row of parser) {
-    const word = normalizedWord(row.word);
-    if (word === null) continue;
-    const chinese = conciseChinese(row.translation);
-    if (chinese === null) continue;
-    const isCatalog = catalogWords.has(word);
-    const bnc = positiveRank(row.bnc);
-    const frq = positiveRank(row.frq);
-    const isOxford = String(row.oxford ?? "").trim() !== "" && String(row.oxford) !== "0";
-    const entry = { word, phonetic: firstPhonetic(row.phonetic), chinese, tags: tagsFor(row, isCatalog), bnc, frq };
-    if (isCatalog && !catalogEntries.has(word)) catalogEntries.set(word, entry);
-    if (isOxford && (Number.isFinite(bnc) || Number.isFinite(frq)) && !fillerEntries.has(word)) fillerEntries.set(word, entry);
+    let checkedHeader = false;
+    const catalogEntries = new Map();
+    const fillerEntries = new Map();
+    const parser = parse({
+      bom: true,
+      columns(header) {
+        const normalized = header.map((column) => column.trim().toLowerCase());
+        assertHeader(normalized);
+        checkedHeader = true;
+        return normalized;
+      },
+      relax_quotes: true,
+      relax_column_count: true,
+      skip_empty_lines: true
+    });
+    let streamError;
+    const pumping = pipeline(Readable.fromWeb(response.body), parser).catch((error) => { streamError = error; });
+    try {
+      for await (const row of parser) {
+        const word = normalizedWord(row.word);
+        if (word === null) continue;
+        const chinese = conciseChinese(row.translation);
+        if (chinese === null) continue;
+        const isCatalog = catalogWords.has(word);
+        const bnc = positiveRank(row.bnc);
+        const frq = positiveRank(row.frq);
+        const isOxford = String(row.oxford ?? "").trim() !== "" && String(row.oxford) !== "0";
+        const entry = { word, phonetic: firstPhonetic(row.phonetic), chinese, tags: tagsFor(row, isCatalog), bnc, frq };
+        if (isCatalog && !catalogEntries.has(word)) catalogEntries.set(word, entry);
+        if (isOxford && (Number.isFinite(bnc) || Number.isFinite(frq)) && !fillerEntries.has(word)) fillerEntries.set(word, entry);
+      }
+    } catch (error) {
+      streamError ??= error;
+    }
+    await pumping;
+    if (streamError !== undefined) {
+      if (controller.signal.aborted) throw new Error(`ECDICT download timed out after ${timeoutMs} ms`, { cause: streamError });
+      throw streamError;
+    }
+    if (!checkedHeader) throw new Error("malformed ECDICT source: no CSV header");
+    return { catalogEntries, fillerEntries };
+  } finally {
+    clearTimeout(timeout);
   }
-  if (!checkedHeader) throw new Error("malformed ECDICT source: no CSV header");
-  return { catalogEntries, fillerEntries };
 }
 
 function withoutRanks(entry) {
@@ -173,6 +202,17 @@ export function selectEntries(catalogWords, catalogEntries, fillerEntries) {
         phonetic: contextualOverride.phonetic ?? source?.phonetic ?? null,
         chinese: contextualOverride.chinese,
         tags: [...new Set([...(source?.tags ?? ["catalog"]), "context", "manual", "proper-name"])].sort(),
+        bnc: source?.bnc ?? Number.POSITIVE_INFINITY,
+        frq: source?.frq ?? Number.POSITIVE_INFINITY
+      });
+    } else if (contextTokenOverrides.has(word)) {
+      const source = catalogEntries.get(word);
+      const tokenOverride = contextTokenOverrides.get(word);
+      catalogEntries.set(word, {
+        word,
+        phonetic: tokenOverride.phonetic,
+        chinese: tokenOverride.chinese,
+        tags: [...new Set([...(source?.tags ?? ["catalog"]), "context", "manual", ...tokenOverride.tags])].sort(),
         bnc: source?.bnc ?? Number.POSITIVE_INFINITY,
         frq: source?.frq ?? Number.POSITIVE_INFINITY
       });
@@ -194,17 +234,18 @@ export function selectEntries(catalogWords, catalogEntries, fillerEntries) {
   return selected;
 }
 
-async function writeStableJson(entries) {
-  await mkdir(dirname(outputPath), { recursive: true });
-  const temporary = `${outputPath}.tmp-${process.pid}`;
+export async function writeStableJson(entries, destination = outputPath) {
+  const serialized = `${JSON.stringify(entries, null, 2)}\n`;
+  await mkdir(dirname(destination), { recursive: true });
+  const temporary = `${destination}.tmp-${process.pid}`;
   try {
     await new Promise((resolve, reject) => {
       const stream = createWriteStream(temporary, { encoding: "utf8" });
       stream.on("error", reject);
       stream.on("finish", resolve);
-      stream.end(`${JSON.stringify(entries, null, 2)}\n`);
+      stream.end(serialized);
     });
-    await rename(temporary, outputPath);
+    await rename(temporary, destination);
   } catch (error) {
     await unlink(temporary).catch(() => {});
     throw error;

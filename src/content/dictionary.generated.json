@@ -1,5 +1,20 @@
 [
   {
+    "word": "a",
+    "phonetic": "/ə; eɪ/",
+    "chinese": "一个；一（不定冠词）",
+    "tags": [
+      "article",
+      "catalog",
+      "context",
+      "ecdict",
+      "gk",
+      "manual",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "about",
     "phonetic": "ә'baut",
     "chinese": "prep. 在...周围, 大约, 有关, 关于",
@@ -207,6 +222,18 @@
       "cet6",
       "ecdict",
       "toefl"
+    ]
+  },
+  {
+    "word": "b",
+    "phonetic": "/biː/",
+    "chinese": "B（区域、入口或站台等位置标签）",
+    "tags": [
+      "catalog",
+      "context",
+      "ecdict",
+      "label",
+      "manual"
     ]
   },
   {
@@ -1360,6 +1387,21 @@
       "ecdict",
       "gk",
       "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "i",
+    "phonetic": "/aɪ/",
+    "chinese": "我",
+    "tags": [
+      "catalog",
+      "context",
+      "ecdict",
+      "gk",
+      "manual",
+      "oxford",
+      "pronoun",
       "zk"
     ]
   },
@@ -3830,17 +3872,6 @@
     "word": "be",
     "phonetic": "bi:",
     "chinese": "v. 是, 表示, 在",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "a",
-    "phonetic": "ei",
-    "chinese": "第一个字母 A",
     "tags": [
       "ecdict",
       "gk",
@@ -12571,37 +12602,6 @@
       "ky",
       "oxford",
       "toefl"
-    ]
-  },
-  {
-    "word": "institution",
-    "phonetic": ".insti'tju:ʃәn",
-    "chinese": "n. 机构, 惯例, 制度",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "encourage",
-    "phonetic": "in'kʌridʒ",
-    "chinese": "vt. 鼓励, 支持, 激励",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "toefl",
-      "zk"
     ]
   }
 ]
