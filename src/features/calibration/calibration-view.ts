@@ -6,17 +6,25 @@ export interface CalibrationBaseline {
   correctItems: number;
   speakingSeconds: number;
   completedAt: string;
+  recordingKeys: string[];
 }
 
 export interface CalibrationStore {
-  saveBaseline(baseline: CalibrationBaseline): Promise<void> | void;
+  saveCalibrationResult(baseline: CalibrationBaseline): Promise<unknown> | unknown;
   saveRecording(key: string, recording: Blob): Promise<void> | void;
+}
+
+export interface CalibrationView extends HTMLElement {
+  dispose(): Promise<void>;
 }
 
 export interface CalibrationOptions {
   speech: SpeechPort;
   store: CalibrationStore;
   now?: () => number;
+  onComplete?: () => void;
+  createObjectURL?: (recording: Blob) => string;
+  revokeObjectURL?: (url: string) => void;
 }
 
 type ChoiceItem = {
@@ -77,8 +85,8 @@ function choiceField(choices: readonly string[], name: string): HTMLFieldSetElem
   return fieldset;
 }
 
-export function renderCalibration(options: CalibrationOptions): HTMLElement {
-  const root = document.createElement("section");
+export function renderCalibration(options: CalibrationOptions): CalibrationView {
+  const root = document.createElement("section") as CalibrationView;
   root.className = "calibration-view";
   root.setAttribute("aria-live", "polite");
   const now = options.now ?? Date.now;
@@ -88,9 +96,18 @@ export function renderCalibration(options: CalibrationOptions): HTMLElement {
   let recording: RecordingSession | undefined;
   let recordingStartedAt = 0;
   let recordingResult: Blob | undefined;
+  let recordingUrl: string | undefined;
+  const recordingKeys: string[] = [];
+  let disposed = false;
+  let saveError: string | undefined;
   let speakingPhase: "idle" | "recording" | "rating" = "idle";
 
   const render = (): void => {
+    if (disposed) return;
+    if (recordingUrl) {
+      (options.revokeObjectURL ?? URL.revokeObjectURL)?.(recordingUrl);
+      recordingUrl = undefined;
+    }
     root.replaceChildren();
     const heading = document.createElement("h1");
     heading.tabIndex = -1;
@@ -115,7 +132,13 @@ export function renderCalibration(options: CalibrationOptions): HTMLElement {
         ? "少提示"
         : supportLevel === "partial" ? "适量提示" : "完整提示";
       primary.textContent = "进入今天训练";
-      primary.addEventListener("click", () => undefined);
+      primary.addEventListener("click", () => {
+        if (options.onComplete) options.onComplete();
+        else root.dispatchEvent(new CustomEvent("app:navigate", {
+          bubbles: true,
+          detail: { href: "#/home" }
+        }));
+      });
       root.append(heading, result, primary);
     } else {
       const item = items[index]!;
@@ -150,6 +173,11 @@ export function renderCalibration(options: CalibrationOptions): HTMLElement {
           primary.disabled = true;
           try {
             recording = await options.speech.startRecording();
+            if (disposed) {
+              await recording.stop().catch(() => undefined);
+              recording = undefined;
+              return;
+            }
             recordingStartedAt = now();
             speakingPhase = "recording";
           } catch {
@@ -166,7 +194,9 @@ export function renderCalibration(options: CalibrationOptions): HTMLElement {
           try {
             recordingResult = await recording!.stop();
             speakingMilliseconds += Math.max(0, stoppedAt - recordingStartedAt);
-            await options.store.saveRecording(`baseline/speaking-${index - 3}`, recordingResult);
+            const recordingKey = `baseline/speaking-${index - 3}`;
+            await options.store.saveRecording(recordingKey, recordingResult);
+            recordingKeys.push(recordingKey);
           } catch {
             recordingResult = undefined;
           }
@@ -176,10 +206,29 @@ export function renderCalibration(options: CalibrationOptions): HTMLElement {
       } else {
         const help = document.createElement("p");
         help.textContent = recordingResult ? "回听后按真实感受选择。" : "麦克风不可用，也可以先无声练习。";
+        if (recordingResult) {
+          const audio = document.createElement("audio");
+          audio.controls = true;
+          audio.setAttribute("aria-label", "回听刚才的校准录音");
+          const createObjectURL = options.createObjectURL ?? URL.createObjectURL?.bind(URL);
+          if (createObjectURL) {
+            recordingUrl = createObjectURL(recordingResult);
+            audio.src = recordingUrl;
+          }
+          root.append(help, audio);
+        } else {
+          root.append(help);
+        }
         const rating = choiceField(["smooth", "retry"], `calibration-rating-${index}`);
         for (const label of rating.querySelectorAll("label")) {
           if (label.textContent === "smooth") label.lastChild!.textContent = "说顺了";
           if (label.textContent === "retry") label.lastChild!.textContent = "还不熟";
+        }
+        if (saveError) {
+          const error = document.createElement("p");
+          error.setAttribute("role", "alert");
+          error.textContent = saveError;
+          root.append(error);
         }
         primary.textContent = "确认";
         primary.addEventListener("click", async () => {
@@ -189,25 +238,34 @@ export function renderCalibration(options: CalibrationOptions): HTMLElement {
             primary.disabled = false;
             return;
           }
-          if (selected.value === "smooth") correctItems += 1;
+          const candidateCorrectItems = correctItems + (selected.value === "smooth" ? 1 : 0);
+          if (index === items.length - 1) {
+            const supportLevel: SupportLevel = candidateCorrectItems >= 5
+              ? "prompt-only"
+              : candidateCorrectItems >= 3 ? "partial" : "full";
+            try {
+              await options.store.saveCalibrationResult({
+                supportLevel,
+                correctItems: candidateCorrectItems,
+                speakingSeconds: speakingMilliseconds / 1_000,
+                completedAt: new Date(now()).toISOString(),
+                recordingKeys: [...recordingKeys]
+              });
+            } catch {
+              saveError = "未能保存，校准结果还在这里。请检查存储空间后重试。";
+              render();
+              return;
+            }
+          }
+          correctItems = candidateCorrectItems;
           index += 1;
           speakingPhase = "idle";
           recording = undefined;
           recordingResult = undefined;
-          if (index === items.length) {
-            const supportLevel: SupportLevel = correctItems >= 5
-              ? "prompt-only"
-              : correctItems >= 3 ? "partial" : "full";
-            await options.store.saveBaseline({
-              supportLevel,
-              correctItems,
-              speakingSeconds: speakingMilliseconds / 1_000,
-              completedAt: new Date(now()).toISOString()
-            });
-          }
+          saveError = undefined;
           render();
         });
-        root.append(help, rating);
+        root.append(rating);
       }
       root.append(primary);
     }
@@ -215,6 +273,20 @@ export function renderCalibration(options: CalibrationOptions): HTMLElement {
   };
 
   render();
+  root.dispose = async () => {
+    if (disposed) return;
+    disposed = true;
+    if (recordingUrl) {
+      (options.revokeObjectURL ?? URL.revokeObjectURL)?.(recordingUrl);
+      recordingUrl = undefined;
+    }
+    const activeRecording = recording;
+    recording = undefined;
+    if (activeRecording && speakingPhase === "recording") {
+      await activeRecording.stop().catch(() => undefined);
+    }
+    root.replaceChildren();
+  };
   return root;
 }
 

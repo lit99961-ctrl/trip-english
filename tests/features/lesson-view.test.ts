@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { allMissions } from "../../src/content/catalog";
 import { createLearnerProgressV1 } from "../../src/domain/progress";
-import { renderLesson, type LessonPersistence } from "../../src/features/lesson/lesson-view";
+import {
+  renderLesson,
+  type LessonPersistence,
+  type LessonView
+} from "../../src/features/lesson/lesson-view";
 import type { RecordingSession, SpeechPort } from "../../src/speech/speech-port";
 
 const hotel = allMissions.find((mission) => mission.id === "hotel-checkin")!;
@@ -14,7 +18,7 @@ function fixture(recognition: { transcript: string; confidence: number | null } 
     recognitionMode: vi.fn(async () => recognition ? "automatic" : "self-rating")
   };
   const persistence: LessonPersistence = {
-    saveExerciseResult: vi.fn(async () => undefined), saveLessonMetrics: vi.fn(async () => undefined)
+    saveExerciseResult: vi.fn(async () => undefined)
   };
   return { speech, persistence };
 }
@@ -44,11 +48,12 @@ describe("speaking-first lesson", () => {
     expect(view.querySelectorAll("button.primary-action")).toHaveLength(1);
   });
 
-  it("saves after a choice but never calls it mastered", async () => {
+  it("saves after active self-review but never calls it mastered", async () => {
     const { speech, persistence } = fixture();
     const view = renderLesson({ mission: hotel, progress: createLearnerProgressV1(), speech, persistence });
     document.body.append(view);
-    view.querySelector<HTMLInputElement>('input[type="radio"]')!.click();
+    await click(view);
+    view.querySelector<HTMLInputElement>('input[value="recalled"]')!.click();
     await click(view);
 
     expect(persistence.saveExerciseResult).toHaveBeenCalledTimes(1);
@@ -85,8 +90,10 @@ describe("speaking-first lesson", () => {
     await click(view); // stop
     await click(view); // continue
 
-    expect(persistence.saveLessonMetrics).toHaveBeenCalledWith(expect.objectContaining({ speakingSeconds: 3.4 }));
-    expect(persistence.saveExerciseResult).toHaveBeenCalledTimes(1);
+    expect(persistence.saveExerciseResult).toHaveBeenCalledWith(expect.objectContaining({
+      speakingSeconds: 3.4,
+      lessonState: expect.objectContaining({ phraseAttempts: expect.any(Object) })
+    }));
   });
 
   it("fades prompts from supported text to a situation-only role-play", () => {
@@ -99,5 +106,190 @@ describe("speaking-first lesson", () => {
     expect(view.dataset.stage).toBe("prompt-free-role-play");
     expect(view.textContent).toContain("情境提示");
     expect(view.textContent).not.toContain(hotel.productionPhrases.find((phrase) => phrase.id === hotel.exercises[roleplayIndex]!.phraseId)!.english);
+  });
+
+  it("makes active review reveal-first and self-rated rather than answer selection", async () => {
+    const { speech, persistence } = fixture();
+    const view = renderLesson({ mission: hotel, progress: createLearnerProgressV1(), speech, persistence });
+    document.body.append(view);
+
+    expect(view.querySelector('input[type="radio"]')).toBeNull();
+    expect(primary(view).textContent).toBe("显示答案");
+    await click(view);
+    expect(view.textContent).toContain("想起来了");
+    expect(view.textContent).toContain("需要再练");
+    expect(persistence.saveExerciseResult).not.toHaveBeenCalled();
+    view.querySelector<HTMLInputElement>('input[value="recalled"]')!.click();
+    await click(view);
+    expect(persistence.saveExerciseResult).toHaveBeenCalledOnce();
+  });
+
+  it("checks authored reading questions before closing the lesson", async () => {
+    const { speech, persistence } = fixture();
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = {
+      missionId: hotel.id,
+      completedExerciseIds: hotel.exercises.slice(0, -1).map((item) => item.id)
+    };
+    const view = renderLesson({ mission: hotel, progress, speech, persistence });
+    document.body.append(view);
+
+    expect(view.querySelectorAll("[data-reading-question]")).toHaveLength(1);
+    view.querySelector<HTMLInputElement>("[data-reading-question] input")!.value = "a";
+    await click(view);
+    expect(view.textContent).toContain("再看一眼答案");
+    expect(persistence.saveExerciseResult).not.toHaveBeenCalled();
+    await click(view);
+    expect(persistence.saveExerciseResult).toHaveBeenCalledOnce();
+  });
+
+  it.each(["resolve-null", "reject"])("falls back to self-rating when recognition %s", async (mode) => {
+    const { speech, persistence } = fixture({ transcript: "unused", confidence: null });
+    speech.recognize = mode === "reject"
+      ? vi.fn(async () => { throw new Error("recognition failed"); })
+      : vi.fn(async () => null);
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = { missionId: hotel.id, completedExerciseIds: hotel.exercises.slice(0, 2).map((item) => item.id) };
+    const view = renderLesson({ mission: hotel, progress, speech, persistence });
+    document.body.append(view);
+    await click(view);
+    await click(view);
+
+    expect(view.textContent).toContain("说顺了");
+    expect(view.querySelectorAll("button.primary-action")).toHaveLength(1);
+  });
+
+  it("does not count time when stopping a recording fails", async () => {
+    const { speech, persistence } = fixture();
+    speech.startRecording = vi.fn(async () => ({ stop: async () => { throw new Error("stop failed"); } }));
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = { missionId: hotel.id, completedExerciseIds: hotel.exercises.slice(0, 2).map((item) => item.id) };
+    const view = renderLesson({ mission: hotel, progress, speech, persistence, now: () => 5_000 });
+    document.body.append(view);
+    await click(view);
+    await click(view);
+    view.querySelector<HTMLInputElement>('input[value="smooth"]')!.click();
+    await click(view);
+
+    expect(persistence.saveExerciseResult).toHaveBeenCalledWith(expect.objectContaining({ speakingSeconds: 0 }));
+  });
+
+  it("keeps the exercise recoverable and announces a persistence failure", async () => {
+    const { speech, persistence } = fixture();
+    persistence.saveExerciseResult = vi.fn(async () => { throw new Error("quota"); });
+    const view = renderLesson({ mission: hotel, progress: createLearnerProgressV1(), speech, persistence });
+    document.body.append(view);
+    await click(view);
+    view.querySelector<HTMLInputElement>('input[value="recalled"]')!.click();
+    await click(view);
+
+    expect(view.textContent).toContain("未能保存");
+    expect(view.dataset.stage).toBe("active-review");
+    expect(primary(view).disabled).toBe(false);
+  });
+
+  it("restores phrase attempt history and continues in exact authored order", () => {
+    const { speech, persistence } = fixture();
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = {
+      missionId: hotel.id,
+      completedExerciseIds: hotel.exercises.slice(0, 3).map((item) => item.id),
+      phraseAttempts: {
+        [hotel.productionPhrases[0]!.id]: [{ supportLevel: "full", passed: true, answerRevealed: true }]
+      },
+      phraseClasses: { [hotel.productionPhrases[0]!.id]: "practiced" }
+    };
+    const view = renderLesson({ mission: hotel, progress, speech, persistence });
+
+    expect(view.textContent).toContain(hotel.exercises[3]!.promptZh);
+    expect(view.dataset.lastAttemptClass).toBe("practiced");
+  });
+
+  it("navigates on completion and disposes an active recording", async () => {
+    const stop = vi.fn(async () => new Blob(["voice"]));
+    const { speech, persistence } = fixture();
+    speech.startRecording = vi.fn(async () => ({ stop }));
+    const onComplete = vi.fn();
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = { missionId: hotel.id, completedExerciseIds: hotel.exercises.map((item) => item.id) };
+    const finished = renderLesson({ mission: hotel, progress, speech, persistence, onComplete });
+    document.body.append(finished);
+    await click(finished);
+    expect(onComplete).toHaveBeenCalledOnce();
+
+    progress.sessions[hotel.id] = { missionId: hotel.id, completedExerciseIds: hotel.exercises.slice(0, 2).map((item) => item.id) };
+    const active: LessonView = renderLesson({ mission: hotel, progress, speech, persistence });
+    document.body.replaceChildren(active);
+    await click(active);
+    await active.dispose();
+    expect(stop).toHaveBeenCalledOnce();
+    expect(active.childElementCount).toBe(0);
+  });
+
+  it("keeps one primary action through every authored exercise state", async () => {
+    const { speech, persistence } = fixture(null);
+    const view = renderLesson({
+      mission: hotel,
+      progress: createLearnerProgressV1(),
+      speech,
+      persistence
+    });
+    document.body.append(view);
+    const expectOnePrimary = () => {
+      expect(view.querySelectorAll("button.primary-action")).toHaveLength(1);
+    };
+
+    expectOnePrimary();
+    await click(view); // reveal active review
+    expectOnePrimary();
+    view.querySelector<HTMLInputElement>('input[value="recalled"]')!.click();
+    await click(view); // finish active review
+    expectOnePrimary();
+    view.querySelector<HTMLInputElement>('input[value="answer"]')!.click();
+    await click(view); // finish comprehension
+
+    for (let speakingExercise = 0; speakingExercise < 3; speakingExercise += 1) {
+      expectOnePrimary();
+      await click(view); // start
+      expectOnePrimary();
+      await click(view); // stop
+      expectOnePrimary();
+      view.querySelector<HTMLInputElement>('input[value="smooth"]')!.click();
+      await click(view); // finish speaking exercise
+    }
+
+    expectOnePrimary();
+    const readingInput = view.querySelector<HTMLInputElement>("[data-reading-question] input")!;
+    readingInput.value = JSON.parse(readingInput.dataset.expectedAnswers!)[0];
+    await click(view); // check reading
+    expectOnePrimary();
+    await click(view); // close lesson
+    expectOnePrimary();
+    expect(view.textContent).toContain("完成");
+  });
+
+  it("revokes its listen-back URL on dispose", async () => {
+    const revokeObjectURL = vi.fn();
+    const { speech, persistence } = fixture(null);
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = {
+      missionId: hotel.id,
+      completedExerciseIds: hotel.exercises.slice(0, 2).map((item) => item.id)
+    };
+    const view = renderLesson({
+      mission: hotel,
+      progress,
+      speech,
+      persistence,
+      createObjectURL: () => "blob:lesson",
+      revokeObjectURL
+    });
+    document.body.append(view);
+    await click(view);
+    await click(view);
+    expect(view.querySelector("audio")?.getAttribute("src")).toBe("blob:lesson");
+    await view.dispose();
+
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:lesson");
   });
 });

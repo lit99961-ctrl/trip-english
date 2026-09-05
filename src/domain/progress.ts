@@ -2,9 +2,31 @@ import { z } from "zod";
 
 const isoDateTime = z.string().datetime({ offset: true });
 
+const attemptSchema = z.object({
+  supportLevel: z.enum(["full", "english", "partial", "prompt-only"]),
+  passed: z.boolean(),
+  answerRevealed: z.boolean(),
+  hintCount: z.number().int().nonnegative().optional(),
+  timestamp: z.string().optional(),
+  activity: z.enum(["production", "choice"]).optional()
+}).strict();
+
 const sessionSchema = z.object({
   missionId: z.string(),
-  completedExerciseIds: z.array(z.string())
+  completedExerciseIds: z.array(z.string()),
+  phraseAttempts: z.record(z.string(), z.array(attemptSchema)).optional(),
+  phraseClasses: z.record(
+    z.string(),
+    z.enum(["introduced", "practiced", "recalled", "mastered"])
+  ).optional()
+}).strict();
+
+const calibrationSchema = z.object({
+  supportLevel: z.enum(["full", "english", "partial", "prompt-only"]),
+  correctItems: z.number().int().min(0).max(6),
+  speakingSeconds: z.number().nonnegative(),
+  completedAt: isoDateTime,
+  recordingKeys: z.array(z.string().min(1)).max(2)
 }).strict();
 
 const phraseReviewSchema = z.object({
@@ -23,7 +45,8 @@ export const learnerProgressV1Schema = z.object({
   savedPhraseIds: z.array(z.string()),
   speakingSeconds: z.number().nonnegative(),
   hintCount: z.number().int().nonnegative(),
-  promptFreeScenarioIds: z.array(z.string())
+  promptFreeScenarioIds: z.array(z.string()),
+  calibration: calibrationSchema.optional()
 }).strict();
 
 export type LearnerProgressV1 = z.infer<typeof learnerProgressV1Schema>;

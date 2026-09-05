@@ -1,8 +1,19 @@
 import type { LearnerProgressV1 } from "../domain/progress";
+import type { LessonState, SupportLevel } from "../domain/lesson-engine";
 
 export interface SaveExerciseResultInput {
   missionId: string;
   exerciseId: string;
+  lessonState?: LessonState;
+  speakingSeconds?: number;
+}
+
+export interface SaveCalibrationResultInput {
+  supportLevel: SupportLevel;
+  correctItems: number;
+  speakingSeconds: number;
+  completedAt: string;
+  recordingKeys: string[];
 }
 
 export type RestoreToken = string;
@@ -19,6 +30,7 @@ export type RestoreFinalizeOutcome =
 export interface ProgressRepository {
   load(): Promise<LearnerProgressV1>;
   saveExerciseResult(input: SaveExerciseResultInput): Promise<LearnerProgressV1>;
+  saveCalibrationResult(input: SaveCalibrationResultInput): Promise<LearnerProgressV1>;
   saveRecording(key: string, recording: Blob): Promise<void>;
   loadRecording(key: string): Promise<Blob | undefined>;
   beginRestore(progress: LearnerProgressV1): Promise<RestoreToken>;

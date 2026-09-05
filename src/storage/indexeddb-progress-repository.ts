@@ -9,6 +9,7 @@ import type {
   RestoreFinalizeOutcome,
   RestoreRollbackOutcome,
   RestoreToken,
+  SaveCalibrationResultInput,
   SaveExerciseResultInput
 } from "./progress-repository";
 
@@ -62,6 +63,12 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   public async saveExerciseResult(
     input: SaveExerciseResultInput
   ): Promise<LearnerProgressV1> {
+    if (
+      input.speakingSeconds !== undefined
+      && (!Number.isFinite(input.speakingSeconds) || input.speakingSeconds < 0)
+    ) {
+      throw new Error("speakingSeconds must be a non-negative finite number");
+    }
     const database = await this.getDatabase();
     const transaction = database.transaction("progress", "readwrite");
     const storedProgress = await transaction.store.get(PROGRESS_KEY);
@@ -70,18 +77,46 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       missionId: input.missionId,
       completedExerciseIds: []
     };
-    const completedExerciseIds = session.completedExerciseIds.includes(input.exerciseId)
+    const completedExerciseIds = input.lessonState?.completedExerciseIds
+      ?? (session.completedExerciseIds.includes(input.exerciseId)
       ? session.completedExerciseIds
-      : [...session.completedExerciseIds, input.exerciseId];
+      : [...session.completedExerciseIds, input.exerciseId]);
+    if (!completedExerciseIds.includes(input.exerciseId)) {
+      throw new Error("lessonState must include the completed exercise");
+    }
     const nextProgress: LearnerProgressV1 = {
       ...progress,
       activeMissionId: input.missionId,
+      speakingSeconds: input.speakingSeconds === undefined
+        ? progress.speakingSeconds
+        : Math.max(progress.speakingSeconds, input.speakingSeconds),
       sessions: {
         ...progress.sessions,
-        [input.missionId]: { ...session, completedExerciseIds }
+        [input.missionId]: {
+          ...session,
+          completedExerciseIds,
+          ...(input.lessonState === undefined ? {} : {
+            phraseAttempts: input.lessonState.phraseAttempts,
+            phraseClasses: input.lessonState.phraseClasses
+          })
+        }
       }
     };
 
+    const validatedProgress = migrateProgress(nextProgress, this.now());
+    await transaction.store.put(validatedProgress, PROGRESS_KEY);
+    await transaction.done;
+    return validatedProgress;
+  }
+
+  public async saveCalibrationResult(
+    input: SaveCalibrationResultInput
+  ): Promise<LearnerProgressV1> {
+    const database = await this.getDatabase();
+    const transaction = database.transaction("progress", "readwrite");
+    const storedProgress = await transaction.store.get(PROGRESS_KEY);
+    const progress = migrateProgress(storedProgress, this.now());
+    const nextProgress = migrateProgress({ ...progress, calibration: input }, this.now());
     await transaction.store.put(nextProgress, PROGRESS_KEY);
     await transaction.done;
     return nextProgress;

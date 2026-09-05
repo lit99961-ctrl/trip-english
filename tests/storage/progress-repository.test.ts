@@ -140,6 +140,86 @@ describe("IndexedDbProgressRepository", () => {
     expect(loaded?.type).toBe("audio/webm");
   });
 
+  test("atomically persists lesson attempts, classifications, and cumulative speaking time", async () => {
+    const repository = createRepository();
+    const lessonState = {
+      completedExerciseIds: ["listen-1"],
+      phraseAttempts: {
+        reservation: [{
+          supportLevel: "full" as const,
+          passed: true,
+          answerRevealed: true,
+          activity: "production" as const
+        }]
+      },
+      phraseClasses: { reservation: "practiced" as const }
+    };
+
+    await repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "listen-1",
+      lessonState,
+      speakingSeconds: 3.4
+    });
+    repository.close();
+    const reopened = new IndexedDbProgressRepository(databaseNames[0]);
+    repositories.push(reopened);
+
+    await expect(reopened.load()).resolves.toMatchObject({
+      speakingSeconds: 3.4,
+      sessions: {
+        hotel: {
+          completedExerciseIds: ["listen-1"],
+          phraseAttempts: lessonState.phraseAttempts,
+          phraseClasses: lessonState.phraseClasses
+        }
+      }
+    });
+  });
+
+  test("persists calibration result with recoverable recording keys", async () => {
+    const repository = createRepository();
+    const recording = new NodeBlob(["baseline voice"], { type: "audio/webm" });
+    await repository.saveRecording("baseline/speaking-1", recording);
+
+    await repository.saveCalibrationResult({
+      supportLevel: "full",
+      correctItems: 2,
+      speakingSeconds: 4,
+      completedAt: "2026-09-05T00:02:00.000Z",
+      recordingKeys: ["baseline/speaking-1"]
+    });
+    repository.close();
+    const reopened = new IndexedDbProgressRepository(databaseNames[0]);
+    repositories.push(reopened);
+
+    await expect(reopened.load()).resolves.toMatchObject({
+      calibration: {
+        supportLevel: "full",
+        recordingKeys: ["baseline/speaking-1"]
+      }
+    });
+    await expect(reopened.loadRecording("baseline/speaking-1")).resolves.toMatchObject({
+      size: recording.size,
+      type: recording.type
+    });
+  });
+
+  test("rejects invalid lesson metrics without corrupting stored progress", async () => {
+    const repository = createRepository();
+
+    await expect(repository.saveExerciseResult({
+      missionId: "hotel",
+      exerciseId: "listen-1",
+      speakingSeconds: -1
+    })).rejects.toThrow();
+
+    await expect(repository.load()).resolves.toMatchObject({
+      speakingSeconds: 0,
+      sessions: {}
+    });
+  });
+
   test("reset clears progress and recordings while leaving the repository usable", async () => {
     const repository = createRepository();
     await repository.saveExerciseResult({ missionId: "hotel", exerciseId: "listen-1" });
