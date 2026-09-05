@@ -2,12 +2,48 @@ import { describe, expect, it } from "vitest";
 import { businessMissions } from "../../src/content/missions.business";
 import { emergencyPhrases, emergencyCategories } from "../../src/content/emergency-phrases";
 import { travelMissions } from "../../src/content/missions.travel";
+import { allMissions, courseSessions, renderRoleplayPrompt } from "../../src/content/catalog";
+import { scoreTranscript } from "../../src/domain/functional-score";
 
 describe("itinerary course coverage", () => {
   it("has the required mission and emergency phrase counts", () => {
     expect(travelMissions).toHaveLength(12);
     expect(businessMissions).toHaveLength(3);
     expect(emergencyPhrases).toHaveLength(50);
+  });
+
+  it("assembles exactly twelve travel sessions with business readings embedded only in 4, 8, and 11", () => {
+    expect(courseSessions).toHaveLength(12);
+    expect(courseSessions.map((session) => session.sessionNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(courseSessions.every((session) => session.travelMission.kind === "travel")).toBe(true);
+    expect(courseSessions.filter((session) => session.businessMission).map((session) => session.sessionNumber)).toEqual([4, 8, 11]);
+    expect(allMissions).toHaveLength(15);
+  });
+
+  it("uses score-compatible keyword alternatives for every model phrase", () => {
+    for (const phrase of allMissions.flatMap((mission) => mission.productionPhrases)) {
+      expect(scoreTranscript(phrase.english, { requiredKeywords: phrase.requiredKeywordGroups }).passed).toBe(true);
+    }
+    expect(scoreTranscript("I would like to check in.", { requiredKeywords: [["check in", "flight"]] }).passed).toBe(true);
+    expect(scoreTranscript("I would like to check in.", { requiredKeywords: [["passport"]] }).passed).toBe(false);
+  });
+
+  it("binds every role-play variation to its prompt template", () => {
+    for (const exercise of travelMissions.flatMap((mission) => mission.exercises).filter((item) => item.type === "roleplay")) {
+      const rendered = renderRoleplayPrompt(exercise.promptTemplate, exercise.variation);
+      expect(rendered).not.toMatch(/\{[^}]+\}/);
+      expect(rendered).not.toBe(exercise.promptTemplate);
+      expect(Object.values(exercise.variation).some((value) => rendered.includes(value))).toBe(true);
+    }
+  });
+
+  it("exports deeply frozen course and emergency content", () => {
+    expect(Object.isFrozen(courseSessions)).toBe(true);
+    expect(Object.isFrozen(courseSessions[0]!)).toBe(true);
+    expect(Object.isFrozen(courseSessions[0]!.travelMission.productionPhrases)).toBe(true);
+    expect(Object.isFrozen(courseSessions[0]!.travelMission.productionPhrases[0]!.keywords)).toBe(true);
+    expect(Object.isFrozen(emergencyPhrases)).toBe(true);
+    expect(Object.isFrozen(emergencyPhrases[0]!)).toBe(true);
   });
 
   it("uses exactly thirty unique active production targets", () => {
@@ -17,6 +53,15 @@ describe("itinerary course coverage", () => {
 
     expect(targets).toHaveLength(30);
     expect(new Set(targets.map((phrase) => phrase.id)).size).toBe(30);
+  });
+
+  it("keeps business active targets to the two personal introduction facts", () => {
+    expect(businessMissions.flatMap((mission) => mission.productionPhrases)
+      .filter((phrase) => phrase.activeTarget)
+      .map((phrase) => phrase.english)).toEqual([
+      "I work in the internet industry.",
+      "I am traveling in Italy and Switzerland."
+    ]);
   });
 
   it("gives every travel mission recovery language and varied role-play", () => {
@@ -87,7 +132,7 @@ describe("itinerary course coverage", () => {
       return [
         ...mission.productionPhrases.map((phrase) => phrase.english),
         ...mission.recognitionWords,
-        ...mission.exercises.flatMap((exercise) => exercise.readingText ?? [])
+        ...mission.exercises.flatMap((exercise) => exercise.type === "reading" ? exercise.readingText : [])
       ].join(" ").toLowerCase();
     };
 

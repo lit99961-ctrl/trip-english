@@ -9,23 +9,22 @@ export const phraseSchema = z.object({
   keywords: z.array(z.string().min(1)).min(1),
   audio: z.string().startsWith("/audio/").optional(),
   recovery: z.boolean().default(false),
-  activeTarget: z.boolean().default(false)
+  activeTarget: z.boolean().default(false),
+  requiredKeywordGroups: z.array(z.array(z.string().min(1)).min(1)).min(1).default([])
 });
 
-const exerciseFields = {
-  id: z.string(),
-  phraseId: z.string().optional(),
-  promptZh: z.string().min(1),
-  variation: z.record(z.string(), z.string()).optional(),
-  readingText: z.string().min(1).optional()
-};
-
 const exerciseSchema = z.discriminatedUnion("type", [
-  z.object({ ...exerciseFields, type: z.literal("intent") }),
-  z.object({ ...exerciseFields, type: z.literal("shadow") }),
-  z.object({ ...exerciseFields, type: z.literal("recall") }),
-  z.object({ ...exerciseFields, type: z.literal("roleplay"), variation: z.record(z.string(), z.string()) }),
-  z.object({ ...exerciseFields, type: z.literal("reading"), readingText: z.string().min(1) })
+  z.object({ id: z.string(), type: z.literal("intent"), phraseId: z.string().optional(), promptZh: z.string().min(1) }).strict(),
+  z.object({ id: z.string(), type: z.literal("shadow"), phraseId: z.string().optional(), promptZh: z.string().min(1) }).strict(),
+  z.object({ id: z.string(), type: z.literal("recall"), phraseId: z.string().optional(), promptZh: z.string().min(1) }).strict(),
+  z.object({ id: z.string(), type: z.literal("roleplay"), phraseId: z.string().optional(), promptZh: z.string().min(1), variation: z.record(z.string(), z.string()).refine((value) => Object.keys(value).length > 0), promptTemplate: z.string().min(1) }).strict().superRefine((exercise, context) => {
+    const placeholders = [...exercise.promptTemplate.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]!);
+    const keys = Object.keys(exercise.variation);
+    if (placeholders.length === 0 || placeholders.some((key) => !keys.includes(key)) || keys.some((key) => !placeholders.includes(key))) {
+      context.addIssue({ code: "custom", message: "roleplay variation keys must match promptTemplate placeholders" });
+    }
+  }),
+  z.object({ id: z.string(), type: z.literal("reading"), phraseId: z.string().optional(), promptZh: z.string().min(1), readingText: z.string().min(1) }).strict()
 ]);
 
 const missionFields = {

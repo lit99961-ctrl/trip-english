@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertUnique, catalog, validateCatalog } from "../../src/content/catalog";
+import { allMissions, assertUnique, catalog, validateCatalog } from "../../src/content/catalog";
 
 function candidateMission(overrides: Record<string, unknown> = {}) {
   return {
@@ -19,7 +19,7 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
       { id: "hotel-intent", type: "intent", phraseId: "hotel-check-in", promptZh: "选择入住意图" },
       { id: "hotel-shadow", type: "shadow", phraseId: "hotel-name", promptZh: "跟读姓名" },
       { id: "hotel-recall", type: "recall", phraseId: "hotel-room", promptZh: "回忆房间" },
-      { id: "hotel-roleplay", type: "roleplay", phraseId: "hotel-key", promptZh: "索要房卡", variation: { keys: "two" } },
+      { id: "hotel-roleplay", type: "roleplay", phraseId: "hotel-key", promptZh: "索要房卡", variation: { keys: "two" }, promptTemplate: "I need {keys} keys." },
       { id: "hotel-reading", type: "reading", phraseId: "hotel-thanks", promptZh: "朗读致谢", readingText: "HOTEL NOTICE: THANK YOU." }
     ],
     ...overrides
@@ -28,7 +28,8 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
 
 describe("course catalog", () => {
   it("accepts the full catalog and an explicit valid catalog", () => {
-    expect(validateCatalog()).toEqual(catalog);
+    expect(validateCatalog()).toEqual(allMissions);
+    expect(catalog).toHaveLength(12);
     expect(validateCatalog([candidateMission()])).toHaveLength(1);
   });
 

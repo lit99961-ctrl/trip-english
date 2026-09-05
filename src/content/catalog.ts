@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { missionSchema, type Mission } from "../domain/content-schema";
+import { deepFreeze, renderRoleplayPrompt, type DeepReadonly } from "./content-validation";
 import { businessMissions } from "./missions.business";
 import { travelMissions } from "./missions.travel";
 
@@ -19,7 +20,7 @@ export function assertUnique(ids: string[], label: string): void {
   }
 }
 
-export function validateCatalog(candidate: unknown = catalogSource): readonly Mission[] {
+export function validateCatalog(candidate: unknown = missionSource): DeepReadonly<readonly Mission[]> {
   const missions = z.array(missionSchema).parse(candidate);
 
   assertUnique(missions.map((mission) => mission.id), "mission");
@@ -44,9 +45,44 @@ export function validateCatalog(candidate: unknown = catalogSource): readonly Mi
     }
   }
 
-  return missions;
+  return deepFreeze(missions);
 }
 
-const catalogSource = [...travelMissions, ...businessMissions];
+const missionSource = [...travelMissions, ...businessMissions];
 
-export const catalog: readonly Mission[] = validateCatalog(catalogSource);
+export const allMissions: DeepReadonly<readonly Mission[]> = deepFreeze(validateCatalog(missionSource));
+
+export interface CourseSession {
+  readonly sessionNumber: number;
+  readonly travelMission: Mission;
+  readonly businessMission?: Mission;
+}
+
+const businessBySession = new Map([[4, businessMissions[0]!], [8, businessMissions[1]!], [11, businessMissions[2]!]]);
+
+export function validateCourseSessions(candidate: unknown): readonly CourseSession[] {
+  const sessions = candidate as CourseSession[];
+  if (!Array.isArray(sessions) || sessions.length !== 12) throw new Error("course requires exactly 12 sessions");
+  const numbers = sessions.map((session) => session.sessionNumber);
+  if (numbers.some((number, index) => number !== index + 1)) throw new Error("course session numbers must be 1 through 12");
+  for (const session of sessions) {
+    if (session.travelMission.kind !== "travel") throw new Error("every session requires one travel mission");
+    const expectedBusiness = businessBySession.get(session.sessionNumber);
+    if (session.businessMission !== expectedBusiness) throw new Error("business missions must be embedded in sessions 4, 8, and 11");
+  }
+  const activeTargets = sessions.flatMap((session) => [session.travelMission, session.businessMission].filter(Boolean).flatMap((mission) => mission!.productionPhrases)).filter((phrase) => phrase.activeTarget);
+  if (activeTargets.length !== 30) throw new Error("course requires exactly 30 active targets");
+  return sessions;
+}
+
+const courseSessionSource = travelMissions.map((travelMission, index) => ({
+  sessionNumber: index + 1,
+  travelMission,
+  businessMission: businessBySession.get(index + 1)
+}));
+
+export const courseSessions: DeepReadonly<readonly CourseSession[]> = deepFreeze(validateCourseSessions(courseSessionSource));
+
+/** Consumer-facing twelve-session course. */
+export const catalog = courseSessions;
+export { renderRoleplayPrompt };

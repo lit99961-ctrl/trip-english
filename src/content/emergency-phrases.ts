@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { deepFreeze, type DeepReadonly } from "./content-validation";
+
 export const emergencyCategories = [
   "airport",
   "hotel",
@@ -8,7 +11,8 @@ export const emergencyCategories = [
   "general-help"
 ] as const;
 
-export type EmergencyCategory = (typeof emergencyCategories)[number];
+export const emergencyCategorySchema = z.enum(emergencyCategories);
+export type EmergencyCategory = z.infer<typeof emergencyCategorySchema>;
 
 export interface EmergencyPhrase {
   readonly id: string;
@@ -18,14 +22,22 @@ export interface EmergencyPhrase {
   readonly keywords: readonly string[];
 }
 
-export const emergencyPhrases: readonly EmergencyPhrase[] = [
+export const emergencyPhraseSchema = z.object({
+  id: z.string().min(1),
+  category: emergencyCategorySchema,
+  english: z.string().min(1),
+  chinese: z.string().min(1),
+  keywords: z.array(z.string().min(1)).min(1)
+});
+
+const emergencyPhraseSource = [
   { id: "em-airport-missed-flight", category: "airport", english: "I missed my flight. What can I do?", chinese: "我错过航班了。我该怎么办？", keywords: ["missed", "flight"] },
   { id: "em-airport-lost-baggage", category: "airport", english: "My baggage did not arrive.", chinese: "我的行李没有到。", keywords: ["baggage", "arrive"] },
   { id: "em-airport-wrong-gate", category: "airport", english: "Is this the right gate?", chinese: "这是正确的登机口吗？", keywords: ["right", "gate"] },
   { id: "em-airport-boarding-pass", category: "airport", english: "I cannot find my boarding pass.", chinese: "我找不到登机牌。", keywords: ["boarding pass", "find"] },
   { id: "em-airport-security-help", category: "airport", english: "I need help at security.", chinese: "我在安检处需要帮助。", keywords: ["security", "help"] },
   { id: "em-airport-connection", category: "airport", english: "My connection is very short.", chinese: "我的转机时间很短。", keywords: ["connection", "short"] },
-  { id: "em-airport-screen", category: "airport", english: "Please show the new gate on the screen.", chinese: "请在屏幕上显示新的登机口。", keywords: ["show", "screen"] },
+  { id: "em-airport-screen", category: "airport", english: "Could you show me the new gate on the screen?", chinese: "您能在屏幕上给我看新的登机口吗？", keywords: ["show", "screen"] },
   { id: "em-airport-wheelchair", category: "airport", english: "I need a wheelchair, please.", chinese: "我需要轮椅，谢谢。", keywords: ["wheelchair", "need"] },
 
   { id: "em-hotel-wrong-room", category: "hotel", english: "This is not my room.", chinese: "这不是我的房间。", keywords: ["not", "room"] },
@@ -76,3 +88,15 @@ export const emergencyPhrases: readonly EmergencyPhrase[] = [
   { id: "em-help-phone", category: "general-help", english: "My phone and bag are missing.", chinese: "我的手机和包不见了。", keywords: ["phone", "bag"] },
   { id: "em-help-location", category: "general-help", english: "This is my location on the map.", chinese: "这是我在地图上的位置。", keywords: ["location", "map"] }
 ];
+
+export function validateEmergencyPhrases(candidate: unknown = emergencyPhraseSource): readonly EmergencyPhrase[] {
+  const phrases = z.array(emergencyPhraseSchema).length(50).parse(candidate);
+  const counts = Object.fromEntries(emergencyCategories.map((category) => [category, phrases.filter((phrase) => phrase.category === category).length]));
+  const expected = { airport: 8, hotel: 8, transport: 10, restaurant: 7, shopping: 5, medical: 6, "general-help": 6 };
+  if (JSON.stringify(counts) !== JSON.stringify(expected)) throw new Error("emergency phrase category counts are invalid");
+  if (new Set(phrases.map((phrase) => phrase.id)).size !== phrases.length) throw new Error("emergency phrase ids must be unique");
+  if (new Set(phrases.map((phrase) => phrase.english)).size !== phrases.length) throw new Error("emergency phrase English must be unique");
+  return phrases;
+}
+
+export const emergencyPhrases: DeepReadonly<readonly EmergencyPhrase[]> = deepFreeze(validateEmergencyPhrases());

@@ -96,4 +96,20 @@ describe("missionSchema", () => {
       exercises: Array.from({ length: 5 }, (_, index) => ({ ...exerciseBase, id: `roleplay-${index}`, type: "roleplay" }))
     }).success).toBe(false);
   });
+
+  it("rejects empty keyword groups and cross-type exercise fields", () => {
+    expect(phraseSchema.safeParse({
+      id: "bad-groups", english: "Help me.", chinese: "帮帮我。", intent: "help", keywords: ["help"], requiredKeywordGroups: [[]]
+    }).success).toBe(false);
+
+    const base = {
+      id: "strict-exercises", kind: "travel", titleZh: "练习", city: "Rome",
+      productionPhrases: Array.from({ length: 5 }, (_, index) => ({
+        id: `strict-${index}`, english: `Phrase ${index}`, chinese: `短语 ${index}`, intent: "practice", keywords: ["phrase"], recovery: index === 0
+      })), recognitionWords: ["notice"]
+    };
+    expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE", variation: { item: "x" } })) }).success).toBe(false);
+    expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-role-${index}`, type: "roleplay", promptZh: "对话", variation: {}, promptTemplate: "Hello" })) }).success).toBe(false);
+    expect(missionSchema.safeParse({ ...base, exercises: Array.from({ length: 5 }, (_, index) => ({ id: `strict-role-${index}`, type: "roleplay", promptZh: "对话", variation: { item: "x" }, promptTemplate: "Hello" })) }).success).toBe(false);
+  });
 });
