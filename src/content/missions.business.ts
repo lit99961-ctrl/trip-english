@@ -1,4 +1,6 @@
-import type { Mission } from "../domain/content-schema";
+import { z } from "zod";
+import { missionSchema, type Mission } from "../domain/content-schema";
+import { deepFreeze, type DeepReadonly } from "./content-validation";
 
 type PhraseDraft = readonly [string, string, string, string, readonly string[], readonly (readonly string[])[], boolean?];
 type ReadingQuestionDraft = Readonly<{ id: string; promptZh: string; expectedAnswers: readonly string[] }>;
@@ -10,7 +12,7 @@ function businessMission(
   recognitionWords: readonly string[],
   readingText: string,
   questions: readonly ReadingQuestionDraft[],
-  activeIndexes: readonly number[],
+  activeSuffixes: readonly string[],
   phrases: readonly PhraseDraft[]
 ): Mission {
   return {
@@ -20,7 +22,7 @@ function businessMission(
     city: "Reading practice",
     embeddedSession,
     recognitionWords: [...recognitionWords],
-    productionPhrases: phrases.map(([suffix, english, chinese, intent, keywords, requiredKeywordGroups, recovery], index) => ({
+    productionPhrases: phrases.map(([suffix, english, chinese, intent, keywords, requiredKeywordGroups, recovery]) => ({
       id: `${id}-${suffix}`,
       english,
       chinese,
@@ -28,33 +30,32 @@ function businessMission(
       keywords: [...keywords],
       requiredKeywordGroups: requiredKeywordGroups.map((group) => [...group]),
       recovery: recovery ?? false,
-      activeTarget: activeIndexes.includes(index)
+      activeTarget: activeSuffixes.includes(suffix)
     })),
-    exercises: buildBusinessExercises(id, phrases, readingText, questions, activeIndexes)
+    exercises: buildBusinessExercises(id, readingText, questions, activeSuffixes)
   };
 }
 
 function buildBusinessExercises(
   id: string,
-  phrases: readonly PhraseDraft[],
   readingText: string,
   questions: readonly ReadingQuestionDraft[],
-  activeIndexes: readonly number[]
+  activeSuffixes: readonly string[]
 ): Mission["exercises"] {
-  const exercises: Mission["exercises"] = questions.map((question) => ({
-    id: `${id}-reading-${question.id}`,
+  const exercises: Mission["exercises"] = [{
+    id: `${id}-reading`,
     type: "reading",
-    promptZh: question.promptZh,
+    promptZh: "阅读材料并回答问题。",
     readingText,
-    questions: [{ promptZh: question.promptZh, expectedAnswers: [...question.expectedAnswers] }]
-  }));
-  if (activeIndexes[0] !== undefined) exercises.push({ id: `${id}-personal-0`, type: "shadow", phraseId: `${id}-${phrases[activeIndexes[0]]![0]}`, promptZh: "跟读自我介绍。" });
-  if (activeIndexes[1] !== undefined) exercises.push({ id: `${id}-personal-1`, type: "recall", phraseId: `${id}-${phrases[activeIndexes[1]]![0]}`, promptZh: "不看提示，说出自我介绍。" });
+    questions: questions.map((question) => ({ promptZh: question.promptZh, expectedAnswers: [...question.expectedAnswers] }))
+  }];
+  if (activeSuffixes[0] !== undefined) exercises.push({ id: `${id}-personal-0`, type: "shadow", phraseId: `${id}-${activeSuffixes[0]}`, promptZh: "跟读自我介绍。" });
+  if (activeSuffixes[1] !== undefined) exercises.push({ id: `${id}-personal-1`, type: "recall", phraseId: `${id}-${activeSuffixes[1]}`, promptZh: "不看提示，说出自我介绍。" });
   return exercises;
 }
 
-export const businessMissions: readonly Mission[] = [
-  businessMission("email-action", "邮件：找到行动项", 4, ["sender", "subject", "deadline", "attachment"], "FROM: Alex\nTO: You\nSUBJECT: File for Friday\nHello. Please send the file by Friday.\nThank you.", [{ id: "sender", promptZh: "发件人是谁？", expectedAnswers: ["Alex"] }, { id: "recipient", promptZh: "谁需要发送文件？", expectedAnswers: ["You"] }, { id: "action", promptZh: "要做什么？", expectedAnswers: ["send the file"] }, { id: "deadline", promptZh: "截止日是什么时候？", expectedAnswers: ["Friday"] }, { id: "subject", promptZh: "主题是什么？", expectedAnswers: ["File"] }], [6, 7], [
+const businessMissionSource: readonly Mission[] = [
+  businessMission("email-action", "邮件：找到行动项", 4, ["sender", "subject", "deadline", "attachment"], "FROM: Alex\nTO: You\nSUBJECT: File for Friday\nHello. Please send the file by Friday.\nThank you.", [{ id: "sender", promptZh: "发件人是谁？", expectedAnswers: ["Alex"] }, { id: "recipient", promptZh: "谁需要发送文件？", expectedAnswers: ["You"] }, { id: "action", promptZh: "要做什么？", expectedAnswers: ["send the file"] }, { id: "deadline", promptZh: "截止日是什么时候？", expectedAnswers: ["Friday"] }, { id: "subject", promptZh: "主题是什么？", expectedAnswers: ["File"] }], ["work", "travel"], [
     ["send", "Please send the file by Friday.", "请在周五前发送文件。", "request-action", ["send", "Friday"], [["send"], ["file"], ["Friday"]]],
     ["reply", "I will send it today.", "我今天会发送它。", "confirm-action", ["send", "today"], [["send"], ["today"]]],
     ["topic", "The email is about the file.", "这封邮件是关于文件的。", "identify-topic", ["email", "file"], [["email"], ["file"]]],
@@ -81,3 +82,7 @@ export const businessMissions: readonly Mission[] = [
     ["clarify", "Could you tell me the next step?", "你能告诉我下一步吗？", "recover-next-step", ["next", "step"], [["next step"]], true]
   ])
 ];
+
+export const businessMissions: DeepReadonly<readonly Mission[]> = deepFreeze(
+  z.array(missionSchema).parse(businessMissionSource)
+);

@@ -76,6 +76,8 @@ describe("missionSchema", () => {
 
     expect(missionSchema.safeParse({ ...base, kind: "business" }).success).toBe(false);
     expect(missionSchema.safeParse({ ...base, kind: "business", embeddedSession: 8 }).success).toBe(true);
+    expect(missionSchema.safeParse({ ...base, kind: "business", embeddedSession: 8, exercises: [base.exercises[0]] }).success).toBe(true);
+    expect(missionSchema.safeParse({ ...base, kind: "travel", exercises: [base.exercises[0]] }).success).toBe(false);
     expect(missionSchema.safeParse({ ...base, kind: "business", embeddedSession: 5 }).success).toBe(false);
     expect(missionSchema.safeParse({ ...base, kind: "travel", embeddedSession: 8 }).success).toBe(false);
   });

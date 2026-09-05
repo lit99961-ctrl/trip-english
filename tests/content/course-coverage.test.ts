@@ -83,6 +83,27 @@ describe("itinerary course coverage", () => {
     expect(Object.isFrozen(emergencyPhrases[0]!)).toBe(true);
   });
 
+  it("exports validated deeply frozen mission modules", () => {
+    for (const missions of [travelMissions, businessMissions]) {
+      const mission = missions[0]!;
+      const phrase = mission.productionPhrases[0]!;
+      const exercise = mission.exercises[0]!;
+      const group = phrase.requiredKeywordGroups[0]!;
+      const originalAlternative = group[0];
+
+      expect(Object.isFrozen(missions)).toBe(true);
+      expect(Object.isFrozen(mission)).toBe(true);
+      expect(Object.isFrozen(mission.productionPhrases)).toBe(true);
+      expect(Object.isFrozen(phrase)).toBe(true);
+      expect(Object.isFrozen(mission.exercises)).toBe(true);
+      expect(Object.isFrozen(exercise)).toBe(true);
+      expect(Object.isFrozen(phrase.requiredKeywordGroups)).toBe(true);
+      expect(Object.isFrozen(group)).toBe(true);
+      expect(() => { (group as string[])[0] = "mutated"; }).toThrow();
+      expect(group[0]).toBe(originalAlternative);
+    }
+  });
+
   it("uses exactly thirty unique active production targets", () => {
     const targets = [...travelMissions, ...businessMissions]
       .flatMap((mission) => mission.productionPhrases)
@@ -99,11 +120,14 @@ describe("itinerary course coverage", () => {
 
     for (const phrase of targets) {
       expect(phrase.requiredKeywordGroups.length, phrase.id).toBeGreaterThanOrEqual(2);
-      const incompleteFragment = phrase.requiredKeywordGroups[0]![0]!;
-      expect(
-        scoreTranscript(incompleteFragment, { requiredKeywords: phrase.requiredKeywordGroups }).passed,
-        `${phrase.id}: ${incompleteFragment}`
-      ).toBe(false);
+      for (const group of phrase.requiredKeywordGroups) {
+        for (const incompleteFragment of group) {
+          expect(
+            scoreTranscript(incompleteFragment, { requiredKeywords: phrase.requiredKeywordGroups }).passed,
+            `${phrase.id}: ${incompleteFragment}`
+          ).toBe(false);
+        }
+      }
       expect(
         scoreTranscript(phrase.english, { requiredKeywords: phrase.requiredKeywordGroups }).passed,
         phrase.id
@@ -113,8 +137,30 @@ describe("itinerary course coverage", () => {
 
   it("rejects representative bare travel objects", () => {
     expect(passesPhrase("hk-checkin-gate", "gate")).toBe(false);
+    expect(passesPhrase("helsinki-transfer-gate", "gate")).toBe(false);
+    expect(passesPhrase("italy-high-speed-rail-platform", "is platform")).toBe(false);
     expect(passesPhrase("italy-high-speed-rail-platform", "platform")).toBe(false);
+    expect(passesPhrase("shopping-tax-refund-size", "have medium")).toBe(false);
     expect(passesPhrase("shopping-tax-refund-size", "medium")).toBe(false);
+  });
+
+  it("keeps the explicit twenty-eight travel target suffixes", () => {
+    expect(travelMissions.flatMap((mission) => mission.productionPhrases)
+      .filter((phrase) => phrase.activeTarget)
+      .map((phrase) => phrase.id)).toEqual([
+      "hk-checkin-check-in", "hk-checkin-passport",
+      "helsinki-transfer-transfer", "helsinki-transfer-security",
+      "rome-arrival-arrivals", "rome-arrival-baggage",
+      "hotel-checkin-reservation", "hotel-checkin-name", "hotel-checkin-room",
+      "directions-tickets-direction", "directions-tickets-entrance", "directions-tickets-ticket",
+      "restaurant-table", "restaurant-menu", "restaurant-order",
+      "italy-high-speed-rail-train", "italy-high-speed-rail-platform",
+      "venice-vaporetto-stop", "venice-vaporetto-line",
+      "milan-swiss-transfer-interlaken", "milan-swiss-transfer-change",
+      "swiss-mountain-transit-train", "swiss-mountain-transit-cable",
+      "shopping-tax-refund-size", "shopping-tax-refund-color",
+      "urgent-help-lost-separated", "urgent-help-phone", "urgent-help-bag"
+    ]);
   });
 
   it("keeps business active targets to the two personal introduction facts", () => {
@@ -233,19 +279,23 @@ describe("itinerary course coverage", () => {
     expect(message).toMatch(/next step/i);
   });
 
-  it("uses semantic business reading IDs without unrelated phrase links", () => {
-    const readingIds = businessMissions.flatMap((mission) =>
-      mission.exercises.filter((exercise) => exercise.type === "reading").map((exercise) => exercise.id)
-    );
-
-    expect(readingIds).toEqual([
-      "email-action-reading-sender", "email-action-reading-recipient", "email-action-reading-action", "email-action-reading-deadline", "email-action-reading-subject",
-      "internet-headline-reading-company", "internet-headline-reading-product", "internet-headline-reading-addition", "internet-headline-reading-change-type", "internet-headline-reading-date",
-      "message-intent-reading-request", "message-intent-reading-confirmer", "message-intent-reading-unavailable-person", "message-intent-reading-new-time", "message-intent-reading-next-step"
-    ]);
-    expect(businessMissions.flatMap((mission) => mission.exercises)
-      .filter((exercise) => exercise.type === "reading")
-      .every((exercise) => exercise.phraseId === undefined)).toBe(true);
+  it("uses one complete reading artifact per business mission", () => {
+    for (const mission of businessMissions) {
+      const readings = mission.exercises.filter((exercise) => exercise.type === "reading");
+      expect(readings).toHaveLength(1);
+      expect(readings[0]!.id).toBe(`${mission.id}-reading`);
+      expect(readings[0]!.phraseId).toBeUndefined();
+      expect(readings[0]!.questions).toHaveLength(5);
+      for (const question of readings[0]!.questions) {
+        expect(question.expectedAnswers.some((answer) => readings[0]!.readingText.toLowerCase().includes(answer.toLowerCase()))).toBe(true);
+      }
+    }
+    const emailExercises = businessMissions.find((mission) => mission.id === "email-action")!.exercises;
+    expect(emailExercises).toHaveLength(3);
+    expect(emailExercises.find((exercise) => exercise.type === "shadow")?.phraseId).toBe("email-action-work");
+    expect(emailExercises.find((exercise) => exercise.type === "recall")?.phraseId).toBe("email-action-travel");
+    expect(businessMissions.find((mission) => mission.id === "internet-headline")!.exercises).toHaveLength(1);
+    expect(businessMissions.find((mission) => mission.id === "message-intent")!.exercises).toHaveLength(1);
   });
 
   it("links varied role-plays to phrases that match the rendered situation", () => {

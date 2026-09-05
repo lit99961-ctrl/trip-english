@@ -32,17 +32,17 @@ const missionFields = {
   titleZh: z.string().min(1),
   city: z.string().min(1),
   productionPhrases: z.array(phraseSchema).min(5).max(8),
-  recognitionWords: z.array(z.string()).min(1),
-  exercises: z.array(exerciseSchema).min(5)
+  recognitionWords: z.array(z.string()).min(1)
 };
 
 export const missionSchema = z
   .discriminatedUnion("kind", [
-    z.object({ ...missionFields, kind: z.literal("travel"), embeddedSession: z.never().optional() }),
+    z.object({ ...missionFields, kind: z.literal("travel"), embeddedSession: z.never().optional(), exercises: z.array(exerciseSchema).min(5) }),
     z.object({
       ...missionFields,
       kind: z.literal("business"),
-      embeddedSession: z.union([z.literal(4), z.literal(8), z.literal(11)])
+      embeddedSession: z.union([z.literal(4), z.literal(8), z.literal(11)]),
+      exercises: z.array(exerciseSchema).min(1)
     })
   ])
   .refine(
