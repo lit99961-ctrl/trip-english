@@ -15,32 +15,36 @@ const outputPath = join(projectRoot, "src/content/dictionary.generated.json");
 
 // Audited proper names use their course-context meaning even when ECDICT has a
 // homonymous headword. ECDICT phonetics and source tags are retained when useful.
+function properName(chinese, phonetic) {
+  return { chinese, ...(phonetic === undefined ? {} : { phonetic }) };
+}
+
 const contextProperNameOverrides = new Map(Object.entries({
-  "alex": "亚历克斯（人名）",
-  "bright": "Bright App（示例应用名）",
-  "florence": "佛罗伦萨（意大利城市）",
-  "gornergrat": "戈尔内格拉特（瑞士山地）",
-  "grindelwald": "格林德瓦（瑞士地名）",
-  "helsinki": "赫尔辛基（芬兰城市）",
-  "hong": "香港（Hong Kong 地名组成）",
-  "interlaken": "因特拉肯（瑞士城市）",
-  "italy": "意大利（国家）",
-  "kong": "香港（Hong Kong 地名组成）",
-  "leo": "利奥（人名）",
-  "leonardo": "莱昂纳多特快列车（机场列车）",
-  "li": "李（姓氏）",
-  "lucerne": "卢塞恩（瑞士城市）",
-  "lungern": "伦根（瑞士城镇）",
-  "mia": "米娅（人名）",
-  "milan": "米兰（意大利城市）",
-  "rialto": "里亚托（威尼斯地名/里亚托桥）",
-  "rome": "罗马（意大利城市）",
-  "switzerland": "瑞士（国家）",
-  "termini": "罗马特米尼火车站",
-  "vatican": "梵蒂冈（梵蒂冈博物馆）",
-  "venice": "威尼斯（意大利城市）",
-  "zermatt": "采尔马特（瑞士城镇）",
-  "zurich": "苏黎世（瑞士城市）"
+  "alex": properName("亚历克斯（人名）"),
+  "bright": properName("Bright App（示例应用名）"),
+  "florence": properName("佛罗伦萨（意大利城市）"),
+  "gornergrat": properName("戈尔内格拉特（瑞士山地）"),
+  "grindelwald": properName("格林德瓦（瑞士地名）"),
+  "helsinki": properName("赫尔辛基（芬兰城市）"),
+  "hong": properName("香港（Hong Kong 地名组成）"),
+  "interlaken": properName("因特拉肯（瑞士城市）"),
+  "italy": properName("意大利（国家）"),
+  "kong": properName("香港（Hong Kong 地名组成）"),
+  "leo": properName("利奥（人名）"),
+  "leonardo": properName("莱昂纳多特快列车（机场列车）"),
+  "li": properName("李（姓氏）"),
+  "lucerne": properName("卢塞恩（瑞士城市）"),
+  "lungern": properName("伦根（瑞士城镇）"),
+  "mia": properName("米娅（人名）"),
+  "milan": properName("米兰（意大利城市）"),
+  "rialto": properName("里亚托（威尼斯地名/里亚托桥）"),
+  "rome": properName("罗马（意大利城市）"),
+  "switzerland": properName("瑞士（国家）"),
+  "termini": properName("罗马特米尼火车站", "/ˈtɛːrmini/"),
+  "vatican": properName("梵蒂冈（梵蒂冈博物馆）"),
+  "venice": properName("威尼斯（意大利城市）"),
+  "zermatt": properName("采尔马特（瑞士城镇）"),
+  "zurich": properName("苏黎世（瑞士城市）")
 }));
 
 // Catalog variants without a usable pinned ECDICT translation fall back here.
@@ -161,13 +165,13 @@ function withoutRanks(entry) {
 
 export function selectEntries(catalogWords, catalogEntries, fillerEntries) {
   for (const word of [...catalogWords].sort()) {
-    const contextualMeaning = contextProperNameOverrides.get(word);
-    if (contextualMeaning !== undefined) {
+    const contextualOverride = contextProperNameOverrides.get(word);
+    if (contextualOverride !== undefined) {
       const source = catalogEntries.get(word);
       catalogEntries.set(word, {
         word,
-        phonetic: source?.phonetic ?? null,
-        chinese: contextualMeaning,
+        phonetic: contextualOverride.phonetic ?? source?.phonetic ?? null,
+        chinese: contextualOverride.chinese,
         tags: [...new Set([...(source?.tags ?? ["catalog"]), "context", "manual", "proper-name"])].sort(),
         bnc: source?.bnc ?? Number.POSITIVE_INFINITY,
         frq: source?.frq ?? Number.POSITIVE_INFINITY
