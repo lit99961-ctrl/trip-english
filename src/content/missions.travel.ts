@@ -54,14 +54,14 @@ const travelMissionSource: readonly Mission[] = [
   ]),
   travelMission("helsinki-transfer", "赫尔辛基转机", "Helsinki", ["transfer", "security", "departure", "gate"], { gate: "32", time: "20 minutes" }, "Is gate {gate} this way? I have {time}.", "TRANSFER SECURITY → GATES 31–36", "gate", ["transfer", "security"], [
     ["transfer", "I am connecting to Rome.", "我要转机去罗马。", "state-connection", ["connecting", "Rome"], [["connecting", "connection"], ["Rome"]]],
-    ["security", "Where is transfer security?", "转机安检在哪里？", "find-security", ["transfer", "security"], [["where", "find"], ["transfer security", "security"]]],
+    ["security", "Where is security for transfers?", "转机安检在哪里？", "find-security", ["transfer", "security"], [["where", "find"], ["security"], ["transfer", "transfers"]]],
     ["gate", "Is gate 32 this way?", "32号登机口是这边吗？", "confirm-gate", ["gate", "this way"], [["is gate", "gate 32"], ["this way"]]],
     ["time", "Do I have enough time?", "我的时间够吗？", "ask-time", ["enough", "time"], [["enough"], ["time"]]],
     ["departure", "What time does boarding start?", "几点开始登机？", "ask-boarding-time", ["boarding", "start"], [["boarding"], ["start"]]],
     ["passport", "Where is passport control?", "护照检查在哪里？", "find-passport-control", ["passport", "control"], [["passport control", "passport"]]],
     ["show", "Could you show me on the screen?", "您能在屏幕上给我看吗？", "recover-screen", ["show", "screen"], [["show", "point"], ["screen"]], true]
   ]),
-  travelMission("rome-arrival", "罗马抵达", "Rome", ["arrivals", "baggage claim", "train", "ticket"], { train: "Leonardo Express", quantity: "two" }, "I need {quantity} tickets for the {train}.", "LEONARDO EXPRESS — ROME TERMINI — TICKETS", "express", ["arrivals", "baggage"], [
+  travelMission("rome-arrival", "罗马抵达", "Rome", ["arrivals", "baggage claim", "train", "ticket"], { train: "Leonardo Express", quantity: "two" }, "Where is the {train}? I need {quantity} tickets.", "LEONARDO EXPRESS — ROME TERMINI — TICKETS", "express", ["arrivals", "baggage"], [
     ["arrivals", "Where is the arrivals exit?", "到达出口在哪里？", "find-arrivals-exit", ["arrivals", "exit"], [["where", "find"], ["arrivals"], ["exit"]]],
     ["baggage", "Where is baggage claim?", "行李提取处在哪里？", "find-baggage", ["baggage", "claim"], [["where", "find"], ["baggage claim", "baggage"]]],
     ["lost-bag", "My bag is not here.", "我的行李不在这里。", "report-missing-bag", ["bag", "missing"], [["bag", "baggage"], ["not here", "missing", "lost"]]],
@@ -112,7 +112,7 @@ const travelMissionSource: readonly Mission[] = [
     ["off", "Please tell me when to get off.", "请告诉我什么时候下船。", "ask-stop-alert", ["tell", "get off"], [["get off"]]],
     ["repeat", "Could you say the stop again?", "您能再说一遍站名吗？", "recover-stop", ["again", "stop"], [["stop"], ["again", "repeat"]], true]
   ]),
-  travelMission("milan-swiss-transfer", "米兰转乘瑞士火车", "Milan–Interlaken", ["change", "platform", "border", "delay", "Interlaken"], { destination: "Interlaken", platform: "6" }, "Is this for {destination}? Which platform is {platform}?", "INTERLAKEN — CHANGE TRAINS — PLATFORM 6", "platform", ["interlaken", "change"], [
+  travelMission("milan-swiss-transfer", "米兰转乘瑞士火车", "Milan–Interlaken", ["change", "platform", "border", "delay", "Interlaken"], { destination: "Interlaken", platform: "6" }, "Which platform does the train to {destination} leave from? The board says platform {platform}.", "INTERLAKEN — CHANGE TRAINS — PLATFORM 6", "platform", ["interlaken", "change"], [
     ["interlaken", "Is this train for Interlaken?", "这趟车去因特拉肯吗？", "confirm-destination", ["train", "Interlaken"], [["train"], ["Interlaken"]]],
     ["change", "Where do I change trains?", "我在哪里换车？", "ask-change", ["change", "trains"], [["where"], ["change trains", "transfer trains"]]],
     ["platform", "Which platform does the next train leave from?", "下一趟火车从哪个站台出发？", "find-next-platform", ["platform", "leave from"], [["platform"]]],
@@ -138,7 +138,7 @@ const travelMissionSource: readonly Mission[] = [
     ["taxfree", "Can I get a tax-free form?", "我可以拿退税单吗？", "request-tax-free", ["tax-free", "form"], [["tax free"], ["form"]]],
     ["show", "Could you show me where to sign?", "您能告诉我在哪里签字吗？", "recover-form", ["show", "sign"], [["sign"]], true]
   ]),
-  travelMission("urgent-help", "紧急求助", "Italy and Switzerland", ["lost", "toilet", "police", "doctor", "pharmacy", "112", "location", "bag"], { place: "the station entrance", help: "a police officer" }, "I am lost at {place}. I need {help}.", "WC / TOILET → EMERGENCY 112", "police", ["lost-separated", "phone", "bag"], [
+  travelMission("urgent-help", "紧急求助", "Italy and Switzerland", ["lost", "toilet", "police", "doctor", "pharmacy", "112", "location", "bag"], { place: "the station entrance", help: "a police officer" }, "I am lost at {place}. Where can I find {help}?", "WC / TOILET → EMERGENCY 112", "police", ["lost-separated", "phone", "bag"], [
     ["lost-separated", "I am lost and separated from my group.", "我迷路了，和同伴走散了。", "report-lost-and-separated", ["lost", "separated"], [["lost"], ["separated"]]],
     ["phone", "My phone is out of battery. Can I charge it?", "我的手机没电了。我可以充电吗？", "request-phone-charge", ["phone", "battery", "charge"], [["phone"], ["battery", "charge"]]],
     ["bag", "My bag is missing.", "我的包不见了。", "report-missing-bag", ["bag", "missing"], [["bag"], ["missing", "lost"]]],

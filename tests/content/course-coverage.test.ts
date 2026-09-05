@@ -317,12 +317,26 @@ describe("itinerary course coverage", () => {
   it("links varied role-plays to phrases that match the rendered situation", () => {
     const roleplayFor = (missionId: string) => travelMissions.find((mission) => mission.id === missionId)!
       .exercises.find((exercise) => exercise.type === "roleplay")!;
+    const renderedFor = (missionId: string) => {
+      const exercise = roleplayFor(missionId);
+      return renderRoleplayPrompt(exercise.promptTemplate, exercise.variation);
+    };
 
     expect(roleplayFor("swiss-mountain-transit").phraseId).toBe("swiss-mountain-transit-return");
     expect(roleplayFor("urgent-help").phraseId).toBe("urgent-help-police");
     expect(roleplayFor("italy-high-speed-rail").phraseId).toBe("italy-high-speed-rail-car");
-    expect(renderRoleplayPrompt(roleplayFor("urgent-help").promptTemplate, roleplayFor("urgent-help").variation))
-      .toContain("at the station entrance");
+    expect(roleplayFor("rome-arrival").phraseId).toBe("rome-arrival-express");
+    expect(renderedFor("rome-arrival")).toBe("Where is the Leonardo Express? I need two tickets.");
+    expect(renderedFor("milan-swiss-transfer")).toBe("Which platform does the train to Interlaken leave from? The board says platform 6.");
+    expect(renderedFor("urgent-help")).toBe("I am lost at the station entrance. Where can I find a police officer?");
+  });
+
+  it("uses direct A1 language for transfer security and the arrivals exit", () => {
+    expect(phraseById("helsinki-transfer-security").english).toBe("Where is security for transfers?");
+    expect(phraseById("helsinki-transfer-security").requiredKeywordGroups).toEqual([
+      ["where", "find"], ["security"], ["transfer", "transfers"]
+    ]);
+    expect(phraseById("rome-arrival-arrivals").english).toBe("Where is the arrivals exit?");
   });
 
   it("makes reading questions assessable and links personal active cards to practice", () => {
