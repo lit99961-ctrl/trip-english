@@ -6,6 +6,14 @@ import { allMissions, courseSessions, renderRoleplayPrompt } from "../../src/con
 import { scoreTranscript } from "../../src/domain/functional-score";
 
 describe("itinerary course coverage", () => {
+  const phraseById = (id: string) => allMissions
+    .flatMap((mission) => mission.productionPhrases)
+    .find((phrase) => phrase.id === id)!;
+
+  const passesPhrase = (id: string, transcript: string) => scoreTranscript(transcript, {
+    requiredKeywords: phraseById(id).requiredKeywordGroups
+  }).passed;
+
   it("has the required mission and emergency phrase counts", () => {
     expect(travelMissions).toHaveLength(12);
     expect(businessMissions).toHaveLength(3);
@@ -22,10 +30,35 @@ describe("itinerary course coverage", () => {
 
   it("uses score-compatible keyword alternatives for every model phrase", () => {
     for (const phrase of allMissions.flatMap((mission) => mission.productionPhrases)) {
+      expect(phrase.requiredKeywordGroups.length, phrase.id).toBeGreaterThan(0);
+      expect(phrase.requiredKeywordGroups.every((group) => group.length > 0), phrase.id).toBe(true);
       expect(scoreTranscript(phrase.english, { requiredKeywords: phrase.requiredKeywordGroups }).passed).toBe(true);
     }
     expect(scoreTranscript("I would like to check in.", { requiredKeywords: [["check in", "flight"]] }).passed).toBe(true);
     expect(scoreTranscript("I would like to check in.", { requiredKeywords: [["passport"]] }).passed).toBe(false);
+  });
+
+  it("rejects inadequate fragments for multi-concept travel and personal intents", () => {
+    expect(passesPhrase("hk-checkin-check-in", "flight")).toBe(false);
+    expect(passesPhrase("hk-checkin-seat", "window")).toBe(false);
+    expect(passesPhrase("hk-checkin-repeat", "again")).toBe(false);
+    expect(passesPhrase("helsinki-transfer-show", "screen")).toBe(false);
+    expect(passesPhrase("urgent-help-phone", "phone")).toBe(false);
+    expect(passesPhrase("email-action-travel", "Italy")).toBe(false);
+    expect(passesPhrase("restaurant-table", "table")).toBe(false);
+    expect(passesPhrase("restaurant-bill", "please")).toBe(false);
+  });
+
+  it("accepts short useful responses and authored alternatives", () => {
+    expect(passesPhrase("hk-checkin-check-in", "check in")).toBe(true);
+    expect(passesPhrase("hk-checkin-seat", "window seat")).toBe(true);
+    expect(passesPhrase("hk-checkin-repeat", "repeat slowly")).toBe(true);
+    expect(passesPhrase("helsinki-transfer-show", "show screen")).toBe(true);
+    expect(passesPhrase("urgent-help-phone", "phone charge")).toBe(true);
+    expect(passesPhrase("email-action-travel", "Italy Switzerland")).toBe(true);
+    expect(passesPhrase("restaurant-table", "table two")).toBe(true);
+    expect(passesPhrase("restaurant-bill", "bill")).toBe(true);
+    expect(passesPhrase("rome-arrival-baggage", "baggage claim")).toBe(true);
   });
 
   it("binds every role-play variation to its prompt template", () => {
