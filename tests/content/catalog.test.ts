@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { allMissions, assertUnique, catalog, renderRoleplayPrompt, validateCatalog } from "../../src/content/catalog";
 import { deepFreeze } from "../../src/content/content-validation";
+import { emergencyPhrases } from "../../src/content/emergency-phrases";
 
 function candidateMission(overrides: Record<string, unknown> = {}) {
   return {
@@ -28,6 +29,16 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
 }
 
 describe("course catalog", () => {
+  it("attaches fixed local audio to every production and emergency phrase", () => {
+    const phrases = allMissions.flatMap((mission) => mission.productionPhrases);
+
+    expect(phrases).toHaveLength(100);
+    expect(emergencyPhrases).toHaveLength(50);
+    expect([...phrases, ...emergencyPhrases].every((phrase) =>
+      typeof phrase.audio === "string" && phrase.audio.startsWith("/audio/")
+    )).toBe(true);
+  });
+
   it("freezes mutable descendants even when their parent is already frozen", () => {
     const child = { value: "mutable" };
     const parent = Object.freeze({ child });

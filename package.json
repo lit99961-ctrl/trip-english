@@ -9,6 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "content:dictionary": "node scripts/build-dictionary.mjs",
+    "content:audio": "node scripts/generate-fixed-audio.mjs",
     "check": "npm run test && npm run build"
   },
   "dependencies": {
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@types/node": "^26.4.1",
     "csv-parse": "^7.0.2",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.0.1",

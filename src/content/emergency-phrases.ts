@@ -20,6 +20,7 @@ export interface EmergencyPhrase {
   readonly english: string;
   readonly chinese: string;
   readonly keywords: readonly string[];
+  readonly audio: string;
 }
 
 export const emergencyPhraseSchema = z.object({
@@ -27,10 +28,11 @@ export const emergencyPhraseSchema = z.object({
   category: emergencyCategorySchema,
   english: z.string().min(1),
   chinese: z.string().min(1),
-  keywords: z.array(z.string().min(1)).min(1)
+  keywords: z.array(z.string().min(1)).min(1),
+  audio: z.string().startsWith("/audio/")
 }).strict();
 
-const emergencyPhraseSource = [
+const emergencyPhraseDrafts = [
   { id: "em-airport-missed-flight", category: "airport", english: "I missed my flight. What can I do?", chinese: "我错过航班了。我该怎么办？", keywords: ["missed", "flight"] },
   { id: "em-airport-lost-baggage", category: "airport", english: "My baggage did not arrive.", chinese: "我的行李没有到。", keywords: ["baggage", "arrive"] },
   { id: "em-airport-wrong-gate", category: "airport", english: "Is this the right gate?", chinese: "这是正确的登机口吗？", keywords: ["right", "gate"] },
@@ -88,6 +90,11 @@ const emergencyPhraseSource = [
   { id: "em-help-phone", category: "general-help", english: "My phone and bag are missing.", chinese: "我的手机和包不见了。", keywords: ["phone", "bag"] },
   { id: "em-help-location", category: "general-help", english: "This is my location on the map.", chinese: "这是我在地图上的位置。", keywords: ["location", "map"] }
 ];
+
+const emergencyPhraseSource = emergencyPhraseDrafts.map((phrase) => ({
+  ...phrase,
+  audio: `/audio/emergency/${phrase.id}.aiff`
+}));
 
 export function validateEmergencyPhrases(candidate: unknown = emergencyPhraseSource): readonly EmergencyPhrase[] {
   const phrases = z.array(emergencyPhraseSchema).length(50).parse(candidate);

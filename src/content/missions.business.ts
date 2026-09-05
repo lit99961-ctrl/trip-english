@@ -24,6 +24,7 @@ function businessMission(
     recognitionWords: [...recognitionWords],
     productionPhrases: phrases.map(([suffix, english, chinese, intent, keywords, requiredKeywordGroups, recovery]) => ({
       id: `${id}-${suffix}`,
+      audio: `/audio/phrases/${id}-${suffix}.aiff`,
       english,
       chinese,
       intent,

@@ -4,6 +4,7 @@ import { scoreTranscript } from "../domain/functional-score";
 import { deepFreeze, renderRoleplayPrompt, type DeepReadonly } from "./content-validation";
 import { businessMissions } from "./missions.business";
 import { travelMissions } from "./missions.travel";
+import { emergencyPhrases } from "./emergency-phrases";
 
 export function assertUnique(ids: string[], label: string): void {
   const seen = new Set<string>();
@@ -91,4 +92,34 @@ export const courseSessions = assembledCourse.courseSessions;
 
 /** Consumer-facing twelve-session course. */
 export const catalog = courseSessions;
+
+const safeAudioSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function contentIdToAudioSlug(id: string): string {
+  if (!safeAudioSlugPattern.test(id)) throw new Error(`unsafe audio content id: ${id}`);
+  return id;
+}
+
+function toFixedAudioPhrase(phrase: { readonly id: string; readonly english: string; readonly audio?: string | undefined }) {
+  if (phrase.audio === undefined) throw new Error(`fixed audio path missing for ${phrase.id}`);
+  return { id: phrase.id, english: phrase.english, audio: phrase.audio };
+}
+
+const productionAudioPhrases = allMissions.flatMap((mission) =>
+  mission.productionPhrases.map(toFixedAudioPhrase)
+);
+const emergencyAudioPhrases = emergencyPhrases.map(toFixedAudioPhrase);
+const fixedAudioSource = [...productionAudioPhrases, ...emergencyAudioPhrases];
+
+assertUnique(fixedAudioSource.map((phrase) => phrase.id), "fixed audio");
+assertUnique(fixedAudioSource.map((phrase) => phrase.audio), "fixed audio path");
+if (fixedAudioSource.length !== 150) throw new Error(`fixed audio requires exactly 150 phrases, got ${fixedAudioSource.length}`);
+for (const phrase of fixedAudioSource) {
+  const slug = contentIdToAudioSlug(phrase.id);
+  const directory = phrase.id.startsWith("em-") ? "emergency" : "phrases";
+  const expected = `/audio/${directory}/${slug}.aiff`;
+  if (phrase.audio !== expected) throw new Error(`fixed audio path mismatch for ${phrase.id}: ${phrase.audio}`);
+}
+
+export const fixedAudioPhrases = deepFreeze(fixedAudioSource);
 export { renderRoleplayPrompt };
