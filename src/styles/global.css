@@ -23,14 +23,225 @@ body {
 }
 
 #route-outlet {
-  padding: 24px;
+  padding: 20px;
   outline: none;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-block-start: 0;
+}
+
+h1 {
+  margin-block-end: 12px;
+  font-size: clamp(1.65rem, 8vw, 2.15rem);
+  line-height: 1.12;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+button {
+  padding: 10px 14px;
+  color: var(--ink);
+  background: var(--surface);
+  font-weight: 700;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #fff;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.stack {
+  display: grid;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin-block-end: -8px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.primary-action {
+  width: 100%;
+  min-height: 54px;
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-size: 1.05rem;
+}
+
+.secondary-action {
+  border-color: var(--ink);
+}
+
+.route-map {
+  display: flex;
+  gap: 8px;
+  padding: 4px 2px 12px;
+  margin: 0;
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x proximity;
+}
+
+.route-map li {
+  display: grid;
+  flex: 0 0 118px;
+  min-height: 78px;
+  align-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--paper));
+  scroll-snap-align: start;
+}
+
+.route-map li[aria-current="step"] {
+  border: 2px solid var(--accent);
+  background: #fff;
+}
+
+.city-stamp {
+  justify-self: start;
+  padding: 2px 7px;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.metric-chip {
+  justify-self: start;
+  padding: 7px 11px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--paper);
+  font-weight: 700;
+}
+
+.card-list,
+.metric-grid,
+.recording-comparison {
+  display: grid;
+  gap: 12px;
+}
+
+.phrase-card,
+.metric-grid article,
+.recording-comparison > div,
+.lookup-panel,
+.progress-view > section {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.english-phrase {
+  margin-block-end: 6px;
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.compact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.compact-actions button {
+  flex: 1 1 auto;
+}
+
+.lookup-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.lookup-panel h2,
+.lookup-panel p {
+  margin-block-end: 0;
+}
+
+.metric-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.metric-grid article p {
+  margin: 0;
+  color: var(--accent);
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.progress-view > section {
+  display: grid;
+  gap: 12px;
+}
+
+.progress-view label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+audio {
+  width: 100%;
 }
 
 nav {
+  position: sticky;
+  z-index: 5;
+  bottom: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(12px);
 }
 
 nav a {
@@ -49,6 +260,10 @@ nav a:focus-visible {
   color: var(--accent);
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+nav a[aria-current="page"] {
+  color: var(--accent);
 }
 
 .selection-action-bar {
