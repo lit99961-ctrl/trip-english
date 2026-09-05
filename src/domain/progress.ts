@@ -40,7 +40,10 @@ const phraseReviewSchema = z.object({
   hintCount: z.number().int().nonnegative(),
   masteredAt: isoDateTime.optional(),
   lastAttemptOccurredAt: isoDateTime.optional(),
-  lastScheduleEventId: z.string().min(1).optional()
+  lastScheduleEventId: z.string().min(1).optional(),
+  projectionBaseSuccessfulAttempts: z.number().int().nonnegative().optional(),
+  projectionBaseHintCount: z.number().int().nonnegative().optional(),
+  projectionLegacyDueAt: isoDateTime.optional()
 }).strict();
 
 export const learnerProgressV1Schema = z.object({
@@ -53,6 +56,8 @@ export const learnerProgressV1Schema = z.object({
   speakingSeconds: z.number().nonnegative(),
   hintCount: z.number().int().nonnegative(),
   promptFreeScenarioIds: z.array(z.string()),
+  reviewProjectionVersion: z.literal(1).optional(),
+  reviewProjectionHintBase: z.number().int().nonnegative().optional(),
   calibration: calibrationSchema.optional()
 }).strict();
 

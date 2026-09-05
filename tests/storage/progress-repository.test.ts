@@ -828,6 +828,87 @@ describe("IndexedDbProgressRepository", () => {
     });
   });
 
+  test("projects legacy attempts across sessions once and uses them for mastery", async () => {
+    const repository = createRepository();
+    const legacy = createLearnerProgressV1(new Date("2026-08-30T00:00:00.000Z"));
+    legacy.sessions["legacy-hotel"] = {
+      missionId: "legacy-hotel", completedExerciseIds: ["old-1"],
+      phraseAttempts: { help: [{
+        supportLevel: "english", passed: true, answerRevealed: false,
+        hintCount: 1, activity: "production"
+      }] },
+      phraseClasses: { help: "practiced" }
+    };
+    legacy.sessions["legacy-train"] = {
+      missionId: "legacy-train", completedExerciseIds: ["old-2"],
+      phraseAttempts: { help: [{
+        supportLevel: "prompt-only", passed: true, answerRevealed: false,
+        hintCount: 0, timestamp: "2026-08-31T10:00:00.000Z", activity: "production"
+      }] },
+      phraseClasses: { help: "recalled" }
+    };
+    legacy.hintCount = 1;
+    const token = await repository.beginRestore(legacy);
+    await repository.finalizeRestore(token, legacy);
+
+    const migrated = await repository.load();
+    expect(migrated.reviewProjectionVersion).toBe(1);
+    expect(migrated.phraseReviews.help).toMatchObject({ successfulAttempts: 2, hintCount: 1 });
+
+    const occurredAt = "2026-09-03T10:00:00.000Z";
+    const event = {
+      missionId: "new-help", exerciseId: "e1", eventId: "legacy-third", speakingSecondsDelta: 0,
+      attemptEvent: {
+        attemptId: "legacy-third-attempt", phraseId: "help", missionId: "new-help",
+        hintUsed: false, occurredAt
+      },
+      lessonState: {
+        completedExerciseIds: ["e1"],
+        phraseAttempts: { help: [{
+          attemptId: "legacy-third-attempt", supportLevel: "english" as const, passed: true,
+          answerRevealed: false, hintCount: 0, timestamp: occurredAt,
+          activity: "production" as const
+        }] },
+        phraseClasses: { help: "practiced" as const }
+      }
+    };
+    await repository.saveExerciseResult(event);
+    await repository.saveExerciseResult(event);
+
+    const stored = await repository.load();
+    expect(stored.phraseReviews.help).toMatchObject({
+      successfulAttempts: 3,
+      hintCount: 1,
+      masteredAt: occurredAt,
+      dueAt: "2026-09-10T10:00:00.000Z"
+    });
+    expect(stored.hintCount).toBe(1);
+  });
+
+  test("preserves unexplained legacy review totals while projecting known attempts", async () => {
+    const repository = createRepository();
+    const legacy = createLearnerProgressV1(new Date("2026-08-30T00:00:00.000Z"));
+    legacy.sessions.legacy = {
+      missionId: "legacy", completedExerciseIds: ["old"],
+      phraseAttempts: { help: [{
+        supportLevel: "english", passed: true, answerRevealed: false,
+        hintCount: 1, activity: "production"
+      }] },
+      phraseClasses: { help: "practiced" }
+    };
+    legacy.phraseReviews.help = {
+      dueAt: "2026-09-01T00:00:00.000Z", successfulAttempts: 7, hintCount: 4
+    };
+    legacy.hintCount = 9;
+    const token = await repository.beginRestore(legacy);
+    await repository.finalizeRestore(token, legacy);
+
+    const migrated = await repository.load();
+    expect(migrated.phraseReviews.help).toMatchObject({ successfulAttempts: 7, hintCount: 4 });
+    expect(migrated.hintCount).toBe(9);
+    await expect(repository.load()).resolves.toEqual(migrated);
+  });
+
   test("reset clears progress and recordings while leaving the repository usable", async () => {
     const repository = createRepository();
     await repository.saveExerciseResult({ missionId: "hotel", exerciseId: "listen-1" });

@@ -59,9 +59,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     const database = await this.getDatabase();
     const transaction = database.transaction("progress", "readwrite");
     const storedProgress = await transaction.store.get(PROGRESS_KEY);
-    const progress = migrateProgress(storedProgress, this.now());
+    const progress = projectReviewHistory(migrateProgress(storedProgress, this.now()));
 
-    if (storedProgress === undefined) {
+    if (storedProgress === undefined || stableJson(storedProgress) !== stableJson(progress)) {
       await transaction.store.put(progress, PROGRESS_KEY);
     }
 
@@ -98,7 +98,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     const database = await this.getDatabase();
     const transaction = database.transaction("progress", "readwrite");
     const storedProgress = await transaction.store.get(PROGRESS_KEY);
-    const progress = migrateProgress(storedProgress, this.now());
+    const progress = projectReviewHistory(migrateProgress(storedProgress, this.now()));
     const session = progress.sessions[input.missionId] ?? {
       missionId: input.missionId,
       completedExerciseIds: []
@@ -127,6 +127,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     if (storedEventPayload !== undefined) {
       if (storedEventPayload !== normalizedEventPayload) {
         throw new Error(`exercise event id collision: ${input.eventId}`);
+      }
+      if (stableJson(storedProgress) !== stableJson(progress)) {
+        await transaction.store.put(progress, PROGRESS_KEY);
       }
       await transaction.done;
       return progress;
@@ -173,13 +176,23 @@ export class IndexedDbProgressRepository implements ProgressRepository {
         ...progress.phraseReviews,
         [reviewUpdate.phraseId]: {
           dueAt: reviewUpdate.dueAt,
-          successfulAttempts: (previousReview?.successfulAttempts ?? 0) + reviewUpdate.successfulAttemptDelta,
-          hintCount: (previousReview?.hintCount ?? 0) + reviewUpdate.hintCountDelta,
+          successfulAttempts:
+            (previousReview?.projectionBaseSuccessfulAttempts ?? 0)
+            + reviewUpdate.derivedSuccessfulAttempts,
+          hintCount:
+            (previousReview?.projectionBaseHintCount ?? 0)
+            + reviewUpdate.derivedHintCount,
           ...((previousReview?.masteredAt ?? reviewUpdate.masteredAt) === undefined ? {} : {
             masteredAt: earliestTimestamp(previousReview?.masteredAt, reviewUpdate.masteredAt)
           }),
           lastAttemptOccurredAt: reviewUpdate.lastAttemptOccurredAt,
-          lastScheduleEventId: reviewUpdate.lastScheduleEventId
+          lastScheduleEventId: reviewUpdate.lastScheduleEventId,
+          projectionBaseSuccessfulAttempts:
+            previousReview?.projectionBaseSuccessfulAttempts ?? 0,
+          projectionBaseHintCount: previousReview?.projectionBaseHintCount ?? 0,
+          ...(previousReview?.projectionLegacyDueAt === undefined ? {} : {
+            projectionLegacyDueAt: previousReview.projectionLegacyDueAt
+          })
         }
       };
     const promptFreeScenarioIds = reviewUpdate?.scenarioId === undefined
@@ -189,8 +202,12 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       ...progress,
       activeMissionId: input.missionId,
       phraseReviews,
-      hintCount: progress.hintCount + (reviewUpdate?.hintCountDelta ?? 0),
+      hintCount: progress.hintCount + (reviewUpdate?.currentHintCount ?? 0),
       promptFreeScenarioIds,
+      ...(reviewUpdate === undefined ? {} : {
+        reviewProjectionVersion: 1 as const,
+        reviewProjectionHintBase: progress.reviewProjectionHintBase ?? progress.hintCount
+      }),
       speakingSeconds: isEventWrite
         ? progress.speakingSeconds + input.speakingSecondsDelta!
         : input.speakingSeconds === undefined
@@ -227,7 +244,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     const database = await this.getDatabase();
     const transaction = database.transaction("progress", "readwrite");
     const storedProgress = await transaction.store.get(PROGRESS_KEY);
-    const progress = migrateProgress(storedProgress, this.now());
+    const progress = projectReviewHistory(migrateProgress(storedProgress, this.now()));
     const nextProgress = migrateProgress({ ...progress, calibration: input }, this.now());
     await transaction.store.put(nextProgress, PROGRESS_KEY);
     await transaction.done;
@@ -382,8 +399,9 @@ function reviewForAttempt(
 ): {
   phraseId: string;
   dueAt: string;
-  successfulAttemptDelta: number;
-  hintCountDelta: number;
+  derivedSuccessfulAttempts: number;
+  derivedHintCount: number;
+  currentHintCount: number;
   masteredAt?: string;
   scenarioId?: string;
   lastAttemptOccurredAt: string;
@@ -401,33 +419,20 @@ function reviewForAttempt(
   if (event.hintUsed !== (hintCount > 0)) throw new Error("attempt event hint usage does not match attempt");
 
   const records = learningEventsForPhrase(progress, event.phraseId);
-  records.push({ eventId, event, attempt });
+  records.push({ eventId, event, attempt, historyPrefix: false });
   records.sort(compareLearningEvents);
-  const firstMasteryIndex = records.findIndex((_, index) =>
-    canMaster(records.slice(0, index + 1).map((record) => record.attempt))
-  );
-  const latest = records.at(-1)!;
-  const latestIndex = records.length - 1;
-  const outcome = reviewOutcome(latest.attempt, latestIndex === firstMasteryIndex);
-  const schedule = scheduleReview({
-    outcome,
-    confidence: !latest.attempt.passed
-      ? 1
-      : isPromptFreePass(latest.attempt) || latestIndex === firstMasteryIndex ? 3 : 2,
-    hintCount: latest.attempt.hintCount ?? 0,
-    now: new Date(latest.event.occurredAt)
-  });
-  const productionPass = attempt.passed && attempt.activity !== "choice";
+  const projection = projectLearningRecords(records);
   const promptFreePass = isPromptFreePass(attempt);
   return {
     phraseId: event.phraseId,
-    dueAt: schedule.dueAt,
-    successfulAttemptDelta: productionPass ? 1 : 0,
-    hintCountDelta: hintCount,
-    ...(firstMasteryIndex < 0 ? {} : { masteredAt: records[firstMasteryIndex]!.event.occurredAt }),
+    dueAt: projection.dueAt,
+    derivedSuccessfulAttempts: projection.successfulAttempts,
+    derivedHintCount: projection.hintCount,
+    currentHintCount: hintCount,
+    ...(projection.masteredAt === undefined ? {} : { masteredAt: projection.masteredAt }),
     ...(promptFreePass && event.scenarioId ? { scenarioId: event.scenarioId } : {}),
-    lastAttemptOccurredAt: latest.event.occurredAt,
-    lastScheduleEventId: latest.eventId
+    lastAttemptOccurredAt: projection.lastAttemptOccurredAt,
+    lastScheduleEventId: projection.lastScheduleEventId
   };
 }
 
@@ -435,6 +440,7 @@ interface LearningEventRecord {
   eventId: string;
   event: LearningAttemptEvent;
   attempt: Attempt;
+  historyPrefix: boolean;
 }
 
 function learningEventsForPhrase(
@@ -461,22 +467,162 @@ function learningEventsForPhrase(
           && attempt.timestamp === event.occurredAt
           && event.hintUsed === ((attempt.hintCount ?? 0) > 0)
         ) {
-          records.push({ eventId, event, attempt });
+          records.push({ eventId, event, attempt, historyPrefix: false });
         }
       } catch {
         // Older event payloads may not contain structured attempt metadata.
       }
     }
   }
+  const representedAttemptIds = new Set(records.map((record) => record.attempt.attemptId));
+  const fallbackOccurredAt = new Date(new Date(progress.startedAt).getTime() - 1).toISOString();
+  for (const [sessionId, session] of Object.entries(progress.sessions).sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0
+  )) {
+    for (const [index, legacyAttempt] of (session.phraseAttempts?.[phraseId] ?? []).entries()) {
+      if (legacyAttempt.attemptId && representedAttemptIds.has(legacyAttempt.attemptId)) continue;
+      const stableIdentity = stableJson({ sessionId, phraseId, index, legacyAttempt });
+      const attemptId = legacyAttempt.attemptId ?? `legacy-attempt-${stableHash(stableIdentity)}`;
+      const occurredAt = isCanonicalTimestamp(legacyAttempt.timestamp)
+        ? legacyAttempt.timestamp
+        : fallbackOccurredAt;
+      const attempt = { ...legacyAttempt, attemptId, timestamp: occurredAt };
+      records.push({
+        eventId: `legacy-event-${stableHash(stableIdentity)}`,
+        event: {
+          attemptId,
+          phraseId,
+          missionId: session.missionId,
+          hintUsed: (attempt.hintCount ?? 0) > 0,
+          occurredAt
+        },
+        attempt,
+        historyPrefix: true
+      });
+      representedAttemptIds.add(attemptId);
+    }
+  }
   return records;
 }
 
 function compareLearningEvents(left: LearningEventRecord, right: LearningEventRecord): number {
+  if (left.historyPrefix !== right.historyPrefix) return left.historyPrefix ? -1 : 1;
   if (left.event.occurredAt < right.event.occurredAt) return -1;
   if (left.event.occurredAt > right.event.occurredAt) return 1;
   if (left.eventId < right.eventId) return -1;
   if (left.eventId > right.eventId) return 1;
   return 0;
+}
+
+function projectLearningRecords(records: LearningEventRecord[]): {
+  dueAt: string;
+  successfulAttempts: number;
+  hintCount: number;
+  masteredAt?: string;
+  lastAttemptOccurredAt: string;
+  lastScheduleEventId: string;
+} {
+  records.sort(compareLearningEvents);
+  const firstMasteryIndex = records.findIndex((_, index) =>
+    canMaster(records.slice(0, index + 1).map((record) => record.attempt))
+  );
+  const latest = records.at(-1)!;
+  const latestIndex = records.length - 1;
+  const outcome = reviewOutcome(latest.attempt, latestIndex === firstMasteryIndex);
+  const schedule = scheduleReview({
+    outcome,
+    confidence: !latest.attempt.passed
+      ? 1
+      : isPromptFreePass(latest.attempt) || latestIndex === firstMasteryIndex ? 3 : 2,
+    hintCount: latest.attempt.hintCount ?? 0,
+    now: new Date(latest.event.occurredAt)
+  });
+  return {
+    dueAt: schedule.dueAt,
+    successfulAttempts: records.filter(({ attempt }) =>
+      attempt.passed && attempt.activity !== "choice"
+    ).length,
+    hintCount: records.reduce((total, { attempt }) => total + (attempt.hintCount ?? 0), 0),
+    ...(firstMasteryIndex < 0 ? {} : { masteredAt: records[firstMasteryIndex]!.event.occurredAt }),
+    lastAttemptOccurredAt: latest.event.occurredAt,
+    lastScheduleEventId: latest.eventId
+  };
+}
+
+function projectReviewHistory(progress: LearnerProgressV1): LearnerProgressV1 {
+  const phraseIds = new Set(Object.keys(progress.phraseReviews));
+  for (const session of Object.values(progress.sessions)) {
+    Object.keys(session.phraseAttempts ?? {}).forEach((phraseId) => phraseIds.add(phraseId));
+  }
+  if (phraseIds.size === 0 && progress.reviewProjectionVersion === undefined) return progress;
+  const phraseReviews = { ...progress.phraseReviews };
+  let derivedGlobalHintCount = 0;
+  for (const phraseId of phraseIds) {
+    const records = learningEventsForPhrase(progress, phraseId);
+    const existing = progress.phraseReviews[phraseId];
+    if (records.length === 0) {
+      if (existing) {
+        phraseReviews[phraseId] = {
+          ...existing,
+          projectionBaseSuccessfulAttempts:
+            existing.projectionBaseSuccessfulAttempts ?? existing.successfulAttempts,
+          projectionBaseHintCount: existing.projectionBaseHintCount ?? existing.hintCount
+        };
+      }
+      continue;
+    }
+    const projection = projectLearningRecords(records);
+    derivedGlobalHintCount += projection.hintCount;
+    const baseSuccessfulAttempts = existing?.projectionBaseSuccessfulAttempts
+      ?? Math.max(0, (existing?.successfulAttempts ?? 0) - projection.successfulAttempts);
+    const baseHintCount = existing?.projectionBaseHintCount
+      ?? Math.max(0, (existing?.hintCount ?? 0) - projection.hintCount);
+    const preserveLegacyDue = progress.reviewProjectionVersion === undefined
+      && existing !== undefined
+      && existing.lastScheduleEventId === undefined;
+    const projectionLegacyDueAt = existing?.projectionLegacyDueAt
+      ?? (preserveLegacyDue ? existing?.dueAt : undefined);
+    const hasStructuredEvent = records.some((record) => !record.historyPrefix);
+    phraseReviews[phraseId] = {
+      dueAt: !hasStructuredEvent && projectionLegacyDueAt
+        ? projectionLegacyDueAt
+        : projection.dueAt,
+      successfulAttempts: baseSuccessfulAttempts + projection.successfulAttempts,
+      hintCount: baseHintCount + projection.hintCount,
+      ...((existing?.masteredAt ?? projection.masteredAt) === undefined ? {} : {
+        masteredAt: earliestTimestamp(existing?.masteredAt, projection.masteredAt)
+      }),
+      lastAttemptOccurredAt: projection.lastAttemptOccurredAt,
+      lastScheduleEventId: projection.lastScheduleEventId,
+      projectionBaseSuccessfulAttempts: baseSuccessfulAttempts,
+      projectionBaseHintCount: baseHintCount,
+      ...(projectionLegacyDueAt === undefined ? {} : { projectionLegacyDueAt })
+    };
+  }
+  const reviewProjectionHintBase = progress.reviewProjectionHintBase
+    ?? Math.max(0, progress.hintCount - derivedGlobalHintCount);
+  return {
+    ...progress,
+    phraseReviews,
+    hintCount: reviewProjectionHintBase + derivedGlobalHintCount,
+    reviewProjectionVersion: 1,
+    reviewProjectionHintBase
+  };
+}
+
+function isCanonicalTimestamp(value: string | undefined): value is string {
+  if (!value) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+}
+
+function stableHash(value: string): string {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function isPromptFreePass(attempt: Attempt): boolean {
