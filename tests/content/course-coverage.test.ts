@@ -21,12 +21,22 @@ describe("itinerary course coverage", () => {
 
   it("gives every travel mission recovery language and varied role-play", () => {
     for (const mission of travelMissions) {
-      expect(mission.productionPhrases.some((phrase) => phrase.recovery)).toBe(true);
+      const recoveryPhrases = mission.productionPhrases.filter((phrase) => phrase.recovery);
+      expect(recoveryPhrases.length).toBeGreaterThan(0);
+      expect(recoveryPhrases.every((phrase) => phrase.intent.startsWith("recover-"))).toBe(true);
       expect(
         mission.exercises.some(
           (exercise) => exercise.type === "roleplay" && exercise.variation !== undefined
         )
       ).toBe(true);
+    }
+  });
+
+  it("marks business recovery language with an explicit recovery intent", () => {
+    for (const mission of businessMissions) {
+      const recoveryPhrases = mission.productionPhrases.filter((phrase) => phrase.recovery);
+      expect(recoveryPhrases.length).toBeGreaterThan(0);
+      expect(recoveryPhrases.every((phrase) => phrase.intent.startsWith("recover-"))).toBe(true);
     }
   });
 
@@ -88,6 +98,32 @@ describe("itinerary course coverage", () => {
     expect(textFor("swiss-mountain-transit")).toEqual(expect.stringContaining("zurich airport"));
     expect(textFor("urgent-help")).toEqual(expect.stringContaining("toilet"));
     expect(textFor("urgent-help")).toEqual(expect.stringContaining("bag"));
+  });
+
+  it("provides multi-line, mission-specific business reading artifacts", () => {
+    const readingFor = (id: string) => businessMissions.find((mission) => mission.id === id)!
+      .exercises.find((exercise) => exercise.type === "reading")!.readingText!;
+    const email = readingFor("email-action");
+    const headline = readingFor("internet-headline");
+    const message = readingFor("message-intent");
+
+    expect(email.split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(4);
+    expect(email).toMatch(/from:/i);
+    expect(email).toMatch(/subject:/i);
+    expect(email).toMatch(/send/i);
+    expect(email).toMatch(/friday/i);
+
+    expect(headline.split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(3);
+    expect(headline).toMatch(/headline:/i);
+    expect(headline).toMatch(/summary:/i);
+    expect(headline).toMatch(/launch|update|problem/i);
+
+    expect(message.split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(5);
+    expect(message).toMatch(/could you|please/i);
+    expect(message).toMatch(/yes/i);
+    expect(message).toMatch(/cannot|can't/i);
+    expect(message).toMatch(/schedule|meeting/i);
+    expect(message).toMatch(/next step/i);
   });
 
   it("keeps emergency phrases complete, unique, short, and free of contact details", () => {

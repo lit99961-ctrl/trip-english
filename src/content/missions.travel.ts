@@ -86,7 +86,8 @@ export const travelMissions: readonly Mission[] = [
     ["order", "I would like this pasta.", "我想要这份意面。", "order-food", ["pasta", "this"]],
     ["water", "Still water, please.", "请给不带气的水。", "order-water", ["still", "water"]],
     ["allergy", "I have a nut allergy.", "我对坚果过敏。", "state-allergy", ["nut", "allergy"]],
-    ["bill", "Could I have the bill, please?", "请给我账单，好吗？", "request-bill", ["bill", "please"], true]
+    ["bill", "Could I have the bill, please?", "请给我账单，好吗？", "request-bill", ["bill", "please"]],
+    ["point-menu", "Could you point to it on the menu?", "您能在菜单上指给我看吗？", "recover-menu", ["point", "menu"], true]
   ]),
   travelMission("italy-high-speed-rail", "意大利高铁", "Rome–Florence–Venice", ["platform", "carriage", "seat", "delay", "departure"], { platform: "9", carriage: "4" }, "DEPARTURES: FLORENCE / VENICE — PLATFORM 9", [
     ["train", "Is this the train to Florence?", "这是去佛罗伦萨的火车吗？", "confirm-train", ["train", "Florence"]],
@@ -137,7 +138,7 @@ export const travelMissions: readonly Mission[] = [
     ["medical", "I need a doctor.", "我需要医生。", "request-doctor", ["doctor", "medical"]],
     ["police", "Where can I find a police officer?", "我在哪里能找到警察？", "find-police", ["police", "officer"]],
     ["toilet", "Where is the nearest toilet?", "最近的洗手间在哪里？", "find-toilet", ["nearest", "toilet"]],
-    ["location", "This is my location on the map.", "这是我在地图上的位置。", "show-location", ["location", "map"]],
-    ["emergency", "Please call 112. I need help.", "请拨打112。我需要帮助。", "request-emergency-call", ["112", "help"], true]
+    ["location", "Could you show me this location on the map?", "您能在地图上给我看这个位置吗？", "recover-location", ["show", "location", "map"], true],
+    ["emergency", "Please call 112. I need help.", "请拨打112。我需要帮助。", "request-emergency-call", ["112", "help"]]
   ])
 ];
