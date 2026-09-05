@@ -10,6 +10,7 @@ import {
   encodeBackup,
   inspectBackupImport,
   readBackupText,
+  retryRestoreCleanup,
   restoreBackup
 } from "../../src/storage/backup-codec";
 
@@ -210,11 +211,13 @@ describe("safe backup restore", () => {
     await repository.saveRecording("hotel/listen-1", recording);
     const backup = encodeBackup(progressFixture);
 
-    await expect(restoreBackup(repository, backup, () => true)).resolves.toMatchObject({
+    const result = await restoreBackup(repository, backup, () => true);
+    expect(result).toMatchObject({
       restored: true,
       cleanupPending: false,
       progress: progressFixture
     });
+    expect(result).not.toHaveProperty("cleanupHandle");
     expect(await repository.loadRecording("hotel/listen-1")).toMatchObject({
       size: recording.size,
       type: "audio/webm"
@@ -244,6 +247,17 @@ describe("safe backup restore", () => {
     await expect(restoreBackup(repository, backup, true)).rejects.toThrow(/did not match/i);
     await expect(repository.load()).resolves.toEqual(newerProgress);
     expect(repository.checkpointPresent).toBe(false);
+  });
+
+  test("reports superseded when a newer write happens after reload and before finalization", async () => {
+    const repository = new FaultInjectingRepository(progressFixture);
+    const newerProgress = { ...progressFixture, activeMissionId: "taxi" };
+    repository.interleaveBeforeFinalize = newerProgress;
+
+    await expect(
+      restoreBackup(repository, encodeBackup({ ...progressFixture, activeMissionId: "airport" }), true)
+    ).resolves.toEqual({ restored: false, reason: "superseded" });
+    await expect(repository.load()).resolves.toEqual(newerProgress);
   });
 
   test("does not let a stale token finalize or roll back a newer attempt", async () => {
@@ -278,18 +292,35 @@ describe("safe backup restore", () => {
     await expect(repository.load()).resolves.toEqual(newerProgress);
   });
 
-  test("returns restored success with cleanup pending when checkpoint deletion fails", async () => {
+  test("returns a cleanup handle after a transient finalize failure and retries it safely", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
-    repository.failFinalize = true;
+    repository.failFinalizeOnce = true;
     const restoredProgress = { ...progressFixture, activeMissionId: "taxi" };
 
-    await expect(restoreBackup(repository, encodeBackup(restoredProgress), true)).resolves.toEqual({
-      restored: true,
-      cleanupPending: true,
-      progress: restoredProgress
+    const result = await restoreBackup(repository, encodeBackup(restoredProgress), true);
+
+    expect(result).toMatchObject({ restored: true, cleanupPending: true, progress: restoredProgress });
+    if (!result.restored || !result.cleanupPending) throw new Error("expected cleanup handle");
+    await expect(retryRestoreCleanup(repository, result.cleanupHandle)).resolves.toEqual({
+      status: "finalized"
     });
     await expect(repository.load()).resolves.toEqual(restoredProgress);
-    expect(repository.checkpointPresent).toBe(true);
+    expect(repository.checkpointPresent).toBe(false);
+  });
+
+  test("does not overwrite newer progress when cleanup retry is superseded", async () => {
+    const repository = new FaultInjectingRepository(progressFixture);
+    repository.failFinalizeOnce = true;
+    const restoredProgress = { ...progressFixture, activeMissionId: "airport" };
+    const newerProgress = { ...progressFixture, activeMissionId: "taxi" };
+    const result = await restoreBackup(repository, encodeBackup(restoredProgress), true);
+    if (!result.restored || !result.cleanupPending) throw new Error("expected cleanup handle");
+    repository.interleaveBeforeFinalize = newerProgress;
+
+    await expect(retryRestoreCleanup(repository, result.cleanupHandle)).resolves.toEqual({
+      status: "checkpoint-mismatch"
+    });
+    await expect(repository.load()).resolves.toEqual(newerProgress);
   });
 });
 
@@ -297,7 +328,8 @@ class FaultInjectingRepository implements ProgressRepository {
   public checkpointPresent = false;
   public mismatchedReload: LearnerProgressV1 | undefined;
   public interleaveAfterBegin: LearnerProgressV1 | undefined;
-  public failFinalize = false;
+  public interleaveBeforeFinalize: LearnerProgressV1 | undefined;
+  public failFinalizeOnce = false;
   private progress: LearnerProgressV1;
   private checkpoint:
     | { token: string; previous: LearnerProgressV1; expected: LearnerProgressV1 }
@@ -360,7 +392,14 @@ class FaultInjectingRepository implements ProgressRepository {
   }
 
   public async finalizeRestore(token: string, expected: LearnerProgressV1) {
-    if (this.failFinalize) throw new Error("checkpoint cleanup failed");
+    if (this.interleaveBeforeFinalize && this.checkpoint) {
+      this.progress = structuredClone(this.interleaveBeforeFinalize);
+      this.interleaveBeforeFinalize = undefined;
+    }
+    if (this.failFinalizeOnce) {
+      this.failFinalizeOnce = false;
+      throw new Error("checkpoint cleanup failed");
+    }
     if (
       !this.checkpoint ||
       this.checkpoint.token !== token ||

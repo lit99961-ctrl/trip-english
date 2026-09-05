@@ -6,6 +6,7 @@ const BACKUP_FORMAT = "trip-english-backup" as const;
 const BACKUP_VERSION = 1 as const;
 const DEFAULT_COURSE_VERSION = "1";
 export const MAX_BACKUP_BYTES = 1024 * 1024;
+const cleanupHandleBrand = Symbol("restore-cleanup-handle");
 
 const backupEnvelopeSchema = z
   .object({
@@ -49,10 +50,28 @@ export type RestoreConfirmation =
   | boolean
   | ((preview: BackupPreview) => boolean | Promise<boolean>);
 
+export interface RestoreCleanupHandle {
+  readonly [cleanupHandleBrand]: true;
+}
+
+interface InternalRestoreCleanupHandle extends RestoreCleanupHandle {
+  token: string;
+  expectedProgress: LearnerProgressV1;
+}
+
+export type RestoreCleanupRetryResult =
+  | { status: "finalized" }
+  | { status: "checkpoint-mismatch" };
+
 export type RestoreResult =
   | { restored: true; cleanupPending: false; progress: LearnerProgressV1 }
-  | { restored: true; cleanupPending: true; progress: LearnerProgressV1 }
-  | { restored: false; reason: "cancelled" };
+  | {
+      restored: true;
+      cleanupPending: true;
+      progress: LearnerProgressV1;
+      cleanupHandle: RestoreCleanupHandle;
+    }
+  | { restored: false; reason: "cancelled" | "superseded" };
 
 export function encodeBackup(progress: LearnerProgressV1, options: BackupEncodeOptions = {}): string {
   const now = options.now ?? (() => new Date());
@@ -128,6 +147,20 @@ export async function restoreBackup(
   return restorePreparedBackup(repository, inspectBackupImport(text), confirmation);
 }
 
+export async function retryRestoreCleanup(
+  repository: ProgressRepository,
+  handle: RestoreCleanupHandle
+): Promise<RestoreCleanupRetryResult> {
+  const internalHandle = handle as InternalRestoreCleanupHandle;
+  const finalized = await repository.finalizeRestore(
+    internalHandle.token,
+    internalHandle.expectedProgress
+  );
+  return finalized.status === "finalized"
+    ? { status: "finalized" }
+    : { status: "checkpoint-mismatch" };
+}
+
 async function restorePreparedBackup(
   repository: ProgressRepository,
   prepared: PreparedBackupImport,
@@ -166,10 +199,16 @@ async function restorePreparedBackup(
     if (finalized.status === "finalized") {
       return { restored: true, cleanupPending: false, progress };
     }
+    return { restored: false, reason: "superseded" };
   } catch {
     // The restored state has already re-opened successfully; retain its checkpoint for later cleanup.
+    return {
+      restored: true,
+      cleanupPending: true,
+      progress,
+      cleanupHandle: createCleanupHandle(token, progress)
+    };
   }
-  return { restored: true, cleanupPending: true, progress };
 }
 
 function parseBackupEnvelope(text: string) {
@@ -190,6 +229,18 @@ function validateProgress(progress: unknown): LearnerProgressV1 {
 
 function unsupportedBackupError(): Error {
   return new Error("unsupported backup: this file is invalid or from an incompatible version");
+}
+
+function createCleanupHandle(
+  token: string,
+  expectedProgress: LearnerProgressV1
+): RestoreCleanupHandle {
+  const handle: InternalRestoreCleanupHandle = {
+    [cleanupHandleBrand]: true,
+    token,
+    expectedProgress
+  };
+  return handle;
 }
 
 function progressesEqual(left: LearnerProgressV1, right: LearnerProgressV1): boolean {
