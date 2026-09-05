@@ -5,6 +5,7 @@ import type { ProgressRepository } from "./progress-repository";
 const BACKUP_FORMAT = "trip-english-backup" as const;
 const BACKUP_VERSION = 1 as const;
 const DEFAULT_COURSE_VERSION = "1";
+export const MAX_BACKUP_BYTES = 1024 * 1024;
 
 const backupEnvelopeSchema = z
   .object({
@@ -49,7 +50,8 @@ export type RestoreConfirmation =
   | ((preview: BackupPreview) => boolean | Promise<boolean>);
 
 export type RestoreResult =
-  | { restored: true; progress: LearnerProgressV1 }
+  | { restored: true; cleanupPending: false; progress: LearnerProgressV1 }
+  | { restored: true; cleanupPending: true; progress: LearnerProgressV1 }
   | { restored: false; reason: "cancelled" };
 
 export function encodeBackup(progress: LearnerProgressV1, options: BackupEncodeOptions = {}): string {
@@ -112,6 +114,9 @@ export function createBackupDownload(
 }
 
 export async function readBackupText(file: Blob): Promise<string> {
+  if (file.size > MAX_BACKUP_BYTES) {
+    throw unsupportedBackupError();
+  }
   return file.text();
 }
 
@@ -136,18 +141,17 @@ async function restorePreparedBackup(
     return { restored: false, reason: "cancelled" };
   }
 
-  let checkpointCreated = false;
+  let token: string | undefined;
   try {
-    await repository.createRestoreCheckpoint();
-    checkpointCreated = true;
-    await repository.replaceProgress(progress);
+    token = await repository.beginRestore(progress);
     const reloadedProgress = validateProgress(await repository.load());
-    await repository.clearRestoreCheckpoint();
-    return { restored: true, progress: reloadedProgress };
+    if (!progressesEqual(reloadedProgress, progress)) {
+      throw new Error("restored progress did not match the requested backup");
+    }
   } catch (error) {
-    if (checkpointCreated) {
+    if (token) {
       try {
-        await repository.rollbackRestoreCheckpoint();
+        await repository.rollbackRestore(token, progress);
       } catch (rollbackError) {
         throw new Error("restore failed and rollback failed", {
           cause: { restoreError: error, rollbackError }
@@ -156,6 +160,16 @@ async function restorePreparedBackup(
     }
     throw error;
   }
+
+  try {
+    const finalized = await repository.finalizeRestore(token, progress);
+    if (finalized.status === "finalized") {
+      return { restored: true, cleanupPending: false, progress };
+    }
+  } catch {
+    // The restored state has already re-opened successfully; retain its checkpoint for later cleanup.
+  }
+  return { restored: true, cleanupPending: true, progress };
 }
 
 function parseBackupEnvelope(text: string) {
@@ -176,4 +190,22 @@ function validateProgress(progress: unknown): LearnerProgressV1 {
 
 function unsupportedBackupError(): Error {
   return new Error("unsupported backup: this file is invalid or from an incompatible version");
+}
+
+function progressesEqual(left: LearnerProgressV1, right: LearnerProgressV1): boolean {
+  return stableJson(left) === stableJson(right);
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
 }

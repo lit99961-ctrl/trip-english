@@ -5,14 +5,14 @@ const isoDateTime = z.string().datetime({ offset: true });
 const sessionSchema = z.object({
   missionId: z.string(),
   completedExerciseIds: z.array(z.string())
-});
+}).strict();
 
 const phraseReviewSchema = z.object({
   dueAt: isoDateTime,
   successfulAttempts: z.number().int().nonnegative(),
   hintCount: z.number().int().nonnegative(),
   masteredAt: isoDateTime.optional()
-});
+}).strict();
 
 export const learnerProgressV1Schema = z.object({
   schemaVersion: z.literal(1),
@@ -24,7 +24,7 @@ export const learnerProgressV1Schema = z.object({
   speakingSeconds: z.number().nonnegative(),
   hintCount: z.number().int().nonnegative(),
   promptFreeScenarioIds: z.array(z.string())
-});
+}).strict();
 
 export type LearnerProgressV1 = z.infer<typeof learnerProgressV1Schema>;
 

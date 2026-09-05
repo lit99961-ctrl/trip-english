@@ -4,6 +4,7 @@ import type { LearnerProgressV1 } from "../../src/domain/progress";
 import { IndexedDbProgressRepository } from "../../src/storage/indexeddb-progress-repository";
 import type { ProgressRepository } from "../../src/storage/progress-repository";
 import {
+  MAX_BACKUP_BYTES,
   createBackupDownload,
   decodeBackup,
   encodeBackup,
@@ -41,6 +42,21 @@ function createRepository() {
   return repository;
 }
 
+function backupEnvelope(progress: unknown): string {
+  return JSON.stringify({
+    format: "trip-english-backup",
+    backupVersion: 1,
+    exportedAt: "2026-09-05T08:00:00.000Z",
+    courseVersion: "2026.09",
+    progress
+  });
+}
+
+async function seed(repository: ProgressRepository, progress: LearnerProgressV1): Promise<void> {
+  const token = await repository.beginRestore(progress);
+  await repository.finalizeRestore(token, progress);
+}
+
 afterEach(async () => {
   repositories.splice(0).forEach((repository) => repository.close());
   await Promise.all(databaseNames.splice(0).map((name) => deleteDB(name)));
@@ -64,12 +80,24 @@ describe("backup codec", () => {
     JSON.stringify({ format: "wrong", backupVersion: 1 }),
     JSON.stringify({ format: "trip-english-backup", backupVersion: 2 }),
     JSON.stringify({ schemaVersion: 99 }),
-    JSON.stringify({
-      format: "trip-english-backup",
-      backupVersion: 1,
-      exportedAt: "2026-09-05T08:00:00.000Z",
-      courseVersion: "2026.09",
-      progress: { ...progressFixture, schemaVersion: 99 }
+    backupEnvelope({ ...progressFixture, schemaVersion: 99 }),
+    backupEnvelope({ ...progressFixture, unknownProgressField: true }),
+    backupEnvelope({
+      ...progressFixture,
+      sessions: {
+        hotel: { ...progressFixture.sessions.hotel, unknownSessionField: true }
+      }
+    }),
+    backupEnvelope({
+      ...progressFixture,
+      phraseReviews: {
+        greeting: {
+          dueAt: "2026-09-02T12:00:00.000Z",
+          successfulAttempts: 1,
+          hintCount: 0,
+          unknownReviewField: true
+        }
+      }
     })
   ])("rejects unsupported backup data", (file) => {
     expect(() => decodeBackup(file)).toThrow(/unsupported backup/i);
@@ -106,12 +134,18 @@ describe("backup codec", () => {
     await expect(readBackupText(download.blob)).resolves.toBe(download.text);
     await expect(readBackupText(new NodeBlob([download.text]))).resolves.toBe(download.text);
   });
+
+  test("rejects an oversized import before reading its text", async () => {
+    const oversized = new NodeBlob(["x".repeat(MAX_BACKUP_BYTES + 1)]);
+
+    await expect(readBackupText(oversized)).rejects.toThrow(/unsupported backup/i);
+  });
 });
 
 describe("safe backup restore", () => {
   test("rejects an invalid backup without changing existing IndexedDB progress", async () => {
     const repository = createRepository();
-    await repository.replaceProgress(progressFixture);
+    await seed(repository, progressFixture);
     const before = await repository.load();
 
     await expect(restoreBackup(repository, '{"schemaVersion":99}', true)).rejects.toThrow(
@@ -120,9 +154,34 @@ describe("safe backup restore", () => {
     await expect(repository.load()).resolves.toEqual(before);
   });
 
+  test.each([
+    backupEnvelope({ ...progressFixture, unknownProgressField: true }),
+    backupEnvelope({
+      ...progressFixture,
+      sessions: { hotel: { ...progressFixture.sessions.hotel, unknownSessionField: true } }
+    }),
+    backupEnvelope({
+      ...progressFixture,
+      phraseReviews: {
+        greeting: {
+          dueAt: "2026-09-02T12:00:00.000Z",
+          successfulAttempts: 1,
+          hintCount: 0,
+          unknownReviewField: true
+        }
+      }
+    })
+  ])("rejects unknown progress fields without mutation", async (file) => {
+    const repository = createRepository();
+    await seed(repository, progressFixture);
+
+    await expect(restoreBackup(repository, file, true)).rejects.toThrow(/unsupported backup/i);
+    await expect(repository.load()).resolves.toEqual(progressFixture);
+  });
+
   test("cancellation leaves progress unchanged", async () => {
     const repository = createRepository();
-    await repository.replaceProgress(progressFixture);
+    await seed(repository, progressFixture);
     const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
 
     await expect(restoreBackup(repository, backup, false)).resolves.toMatchObject({
@@ -132,18 +191,30 @@ describe("safe backup restore", () => {
     await expect(repository.load()).resolves.toEqual(progressFixture);
   });
 
+  test("beginRestore atomically checkpoints and replaces real IndexedDB progress", async () => {
+    const repository = createRepository();
+    await seed(repository, progressFixture);
+    const replacement = { ...progressFixture, activeMissionId: "taxi" };
+
+    const token = await repository.beginRestore(replacement);
+
+    await expect(repository.load()).resolves.toEqual(replacement);
+    await expect(repository.rollbackRestore(token, replacement)).resolves.toEqual({ status: "rolled-back" });
+    await expect(repository.load()).resolves.toEqual(progressFixture);
+  });
+
   test("restores valid progress persistently without overwriting recordings", async () => {
     const repository = createRepository();
     const recording = new NodeBlob(["recording"], { type: "audio/webm" });
-    await repository.replaceProgress({ ...progressFixture, activeMissionId: "airport" });
+    await seed(repository, { ...progressFixture, activeMissionId: "airport" });
     await repository.saveRecording("hotel/listen-1", recording);
     const backup = encodeBackup(progressFixture);
 
     await expect(restoreBackup(repository, backup, () => true)).resolves.toMatchObject({
       restored: true,
+      cleanupPending: false,
       progress: progressFixture
     });
-    await expect(repository.rollbackRestoreCheckpoint()).rejects.toThrow("checkpoint");
     expect(await repository.loadRecording("hotel/listen-1")).toMatchObject({
       size: recording.size,
       type: "audio/webm"
@@ -155,57 +226,97 @@ describe("safe backup restore", () => {
     await expect(reopened.load()).resolves.toEqual(progressFixture);
   });
 
-  test("rolls back exact previous progress when reloading the restored state fails", async () => {
+  test("detects a schema-valid reloaded state that does not match the requested backup", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
-    const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
-    repository.failNextLoadAfterReplacement = true;
+    repository.mismatchedReload = { ...progressFixture, activeMissionId: "taxi" };
+    const backup = encodeBackup({ ...progressFixture, activeMissionId: "airport" });
 
-    await expect(restoreBackup(repository, backup, true)).rejects.toThrow("reload failed");
+    await expect(restoreBackup(repository, backup, true)).rejects.toThrow(/did not match/i);
     await expect(repository.load()).resolves.toEqual(progressFixture);
-    expect(repository.checkpointPresent).toBe(true);
   });
 
-  test("rolls back exact previous progress when replacement fails after mutation", async () => {
+  test("preserves a newer interleaving write when a restore verification fails", async () => {
     const repository = new FaultInjectingRepository(progressFixture);
-    const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
-    repository.failNextReplaceAfterMutation = true;
+    const newerProgress = { ...progressFixture, activeMissionId: "taxi" };
+    repository.interleaveAfterBegin = newerProgress;
+    const backup = encodeBackup({ ...progressFixture, activeMissionId: "airport" });
 
-    await expect(restoreBackup(repository, backup, true)).rejects.toThrow("replace failed");
-    await expect(repository.load()).resolves.toEqual(progressFixture);
-    expect(repository.checkpointPresent).toBe(true);
-  });
-
-  test("clears the restore checkpoint only after a successful reload", async () => {
-    const repository = new FaultInjectingRepository(progressFixture);
-    const backup = encodeBackup({ ...progressFixture, activeMissionId: "taxi" });
-
-    await restoreBackup(repository, backup, true);
-
-    expect(repository.checkpointPresentWhenRestoredLoad).toBe(true);
+    await expect(restoreBackup(repository, backup, true)).rejects.toThrow(/did not match/i);
+    await expect(repository.load()).resolves.toEqual(newerProgress);
     expect(repository.checkpointPresent).toBe(false);
+  });
+
+  test("does not let a stale token finalize or roll back a newer attempt", async () => {
+    const repository = createRepository();
+    await seed(repository, progressFixture);
+    const first = { ...progressFixture, activeMissionId: "airport" };
+    const second = { ...progressFixture, activeMissionId: "taxi" };
+    const firstToken = await repository.beginRestore(first);
+    await repository.beginRestore(second);
+
+    await expect(repository.finalizeRestore(firstToken, first)).resolves.toEqual({
+      status: "checkpoint-mismatch"
+    });
+    await expect(repository.rollbackRestore(firstToken, first)).resolves.toEqual({
+      status: "checkpoint-mismatch"
+    });
+    await expect(repository.load()).resolves.toEqual(second);
+  });
+
+  test("does not let a token paired with a newer snapshot roll back that newer progress", async () => {
+    const repository = createRepository();
+    await seed(repository, progressFixture);
+    const token = await repository.beginRestore({ ...progressFixture, activeMissionId: "airport" });
+    const newerProgress = await repository.saveExerciseResult({
+      missionId: "taxi",
+      exerciseId: "roleplay-1"
+    });
+
+    await expect(repository.rollbackRestore(token, newerProgress)).resolves.toEqual({
+      status: "checkpoint-mismatch"
+    });
+    await expect(repository.load()).resolves.toEqual(newerProgress);
+  });
+
+  test("returns restored success with cleanup pending when checkpoint deletion fails", async () => {
+    const repository = new FaultInjectingRepository(progressFixture);
+    repository.failFinalize = true;
+    const restoredProgress = { ...progressFixture, activeMissionId: "taxi" };
+
+    await expect(restoreBackup(repository, encodeBackup(restoredProgress), true)).resolves.toEqual({
+      restored: true,
+      cleanupPending: true,
+      progress: restoredProgress
+    });
+    await expect(repository.load()).resolves.toEqual(restoredProgress);
+    expect(repository.checkpointPresent).toBe(true);
   });
 });
 
 class FaultInjectingRepository implements ProgressRepository {
   public checkpointPresent = false;
-  public failNextReplaceAfterMutation = false;
-  public failNextLoadAfterReplacement = false;
-  public checkpointPresentWhenRestoredLoad: boolean | undefined;
+  public mismatchedReload: LearnerProgressV1 | undefined;
+  public interleaveAfterBegin: LearnerProgressV1 | undefined;
+  public failFinalize = false;
   private progress: LearnerProgressV1;
-  private checkpoint: LearnerProgressV1 | undefined;
-  private replaced = false;
+  private checkpoint:
+    | { token: string; previous: LearnerProgressV1; expected: LearnerProgressV1 }
+    | undefined;
+  private tokenNumber = 0;
 
   public constructor(progress: LearnerProgressV1) {
     this.progress = structuredClone(progress);
   }
 
   public async load(): Promise<LearnerProgressV1> {
-    if (this.replaced) {
-      this.checkpointPresentWhenRestoredLoad = this.checkpointPresent;
+    if (this.interleaveAfterBegin && this.checkpoint) {
+      this.progress = structuredClone(this.interleaveAfterBegin);
+      this.interleaveAfterBegin = undefined;
     }
-    if (this.replaced && this.failNextLoadAfterReplacement) {
-      this.failNextLoadAfterReplacement = false;
-      throw new Error("reload failed");
+    if (this.mismatchedReload) {
+      const mismatch = this.mismatchedReload;
+      this.mismatchedReload = undefined;
+      return structuredClone(mismatch);
     }
     return structuredClone(this.progress);
   }
@@ -221,28 +332,49 @@ class FaultInjectingRepository implements ProgressRepository {
   public async reset(): Promise<void> {}
   public close(): void {}
 
-  public async createRestoreCheckpoint(): Promise<void> {
-    this.checkpoint = structuredClone(this.progress);
+  public async beginRestore(progress: LearnerProgressV1): Promise<string> {
+    const token = `restore-${++this.tokenNumber}`;
+    this.checkpoint = {
+      token,
+      previous: structuredClone(this.progress),
+      expected: structuredClone(progress)
+    };
     this.checkpointPresent = true;
-  }
-
-  public async replaceProgress(progress: LearnerProgressV1): Promise<void> {
     this.progress = structuredClone(progress);
-    this.replaced = true;
-    if (this.failNextReplaceAfterMutation) {
-      this.failNextReplaceAfterMutation = false;
-      throw new Error("replace failed");
+    return token;
+  }
+
+  public async rollbackRestore(token: string, expected: LearnerProgressV1) {
+    if (!this.checkpoint || this.checkpoint.token !== token || !sameProgress(this.checkpoint.expected, expected)) {
+      return { status: "checkpoint-mismatch" as const };
     }
-  }
-
-  public async rollbackRestoreCheckpoint(): Promise<void> {
-    if (!this.checkpoint) throw new Error("checkpoint missing");
-    this.progress = structuredClone(this.checkpoint);
-    this.replaced = false;
-  }
-
-  public async clearRestoreCheckpoint(): Promise<void> {
+    if (!sameProgress(this.progress, expected)) {
+      this.checkpoint = undefined;
+      this.checkpointPresent = false;
+      return { status: "preserved-newer-state" as const };
+    }
+    this.progress = structuredClone(this.checkpoint.previous);
     this.checkpoint = undefined;
     this.checkpointPresent = false;
+    return { status: "rolled-back" as const };
   }
+
+  public async finalizeRestore(token: string, expected: LearnerProgressV1) {
+    if (this.failFinalize) throw new Error("checkpoint cleanup failed");
+    if (
+      !this.checkpoint ||
+      this.checkpoint.token !== token ||
+      !sameProgress(this.checkpoint.expected, expected) ||
+      !sameProgress(this.progress, expected)
+    ) {
+      return { status: "checkpoint-mismatch" as const };
+    }
+    this.checkpoint = undefined;
+    this.checkpointPresent = false;
+    return { status: "finalized" as const };
+  }
+}
+
+function sameProgress(left: LearnerProgressV1, right: LearnerProgressV1): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

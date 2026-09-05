@@ -4,7 +4,13 @@ import {
   migrateProgress,
   type LearnerProgressV1
 } from "../domain/progress";
-import type { ProgressRepository, SaveExerciseResultInput } from "./progress-repository";
+import type {
+  ProgressRepository,
+  RestoreFinalizeOutcome,
+  RestoreRollbackOutcome,
+  RestoreToken,
+  SaveExerciseResultInput
+} from "./progress-repository";
 
 const DATABASE_VERSION = 1;
 const PROGRESS_KEY = "learner-progress";
@@ -21,8 +27,14 @@ interface ProgressDatabase extends DBSchema {
   };
   "restore-checkpoints": {
     key: string;
-    value: unknown;
+    value: RestoreCheckpoint;
   };
+}
+
+interface RestoreCheckpoint {
+  token: RestoreToken;
+  previousProgress: LearnerProgressV1;
+  expectedProgress: LearnerProgressV1;
 }
 
 export class IndexedDbProgressRepository implements ProgressRepository {
@@ -85,46 +97,78 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     return database.get("recordings", key);
   }
 
-  public async createRestoreCheckpoint(): Promise<void> {
+  public async beginRestore(progress: LearnerProgressV1): Promise<RestoreToken> {
+    const expectedProgress = migrateProgress(progress, this.now());
+    const token = crypto.randomUUID();
     const database = await this.getDatabase();
     const transaction = database.transaction(["progress", "restore-checkpoints"], "readwrite");
     const storedProgress = await transaction.objectStore("progress").get(PROGRESS_KEY);
-    const progress = migrateProgress(storedProgress, this.now());
+    const previousProgress = migrateProgress(storedProgress, this.now());
 
     if (storedProgress === undefined) {
-      await transaction.objectStore("progress").put(progress, PROGRESS_KEY);
+      await transaction.objectStore("progress").put(previousProgress, PROGRESS_KEY);
     }
-    await transaction.objectStore("restore-checkpoints").put(progress, RESTORE_CHECKPOINT_KEY);
+    await transaction.objectStore("restore-checkpoints").put(
+      { token, previousProgress, expectedProgress },
+      RESTORE_CHECKPOINT_KEY
+    );
+    await transaction.objectStore("progress").put(expectedProgress, PROGRESS_KEY);
     await transaction.done;
+    return token;
   }
 
-  public async replaceProgress(progress: LearnerProgressV1): Promise<void> {
-    const validatedProgress = migrateProgress(progress, this.now());
-    const database = await this.getDatabase();
-    const transaction = database.transaction("progress", "readwrite");
-    await transaction.store.put(validatedProgress, PROGRESS_KEY);
-    await transaction.done;
-  }
-
-  public async rollbackRestoreCheckpoint(): Promise<void> {
+  public async rollbackRestore(
+    token: RestoreToken,
+    expectedProgress: LearnerProgressV1
+  ): Promise<RestoreRollbackOutcome> {
     const database = await this.getDatabase();
     const transaction = database.transaction(["progress", "restore-checkpoints"], "readwrite");
     const checkpoint = await transaction.objectStore("restore-checkpoints").get(RESTORE_CHECKPOINT_KEY);
 
-    if (checkpoint === undefined) {
+    if (
+      !checkpoint ||
+      checkpoint.token !== token ||
+      !progressesEqual(checkpoint.expectedProgress, expectedProgress)
+    ) {
       await transaction.done;
-      throw new Error("restore checkpoint is unavailable");
+      return { status: "checkpoint-mismatch" };
     }
 
-    await transaction.objectStore("progress").put(migrateProgress(checkpoint, this.now()), PROGRESS_KEY);
+    const currentProgress = await transaction.objectStore("progress").get(PROGRESS_KEY);
+    if (progressesEqual(currentProgress, expectedProgress)) {
+      await transaction.objectStore("progress").put(checkpoint.previousProgress, PROGRESS_KEY);
+      await transaction.objectStore("restore-checkpoints").delete(RESTORE_CHECKPOINT_KEY);
+      await transaction.done;
+      return { status: "rolled-back" };
+    }
+
+    await transaction.objectStore("restore-checkpoints").delete(RESTORE_CHECKPOINT_KEY);
     await transaction.done;
+    return { status: "preserved-newer-state" };
   }
 
-  public async clearRestoreCheckpoint(): Promise<void> {
+  public async finalizeRestore(
+    token: RestoreToken,
+    expectedProgress: LearnerProgressV1
+  ): Promise<RestoreFinalizeOutcome> {
     const database = await this.getDatabase();
-    const transaction = database.transaction("restore-checkpoints", "readwrite");
-    await transaction.store.delete(RESTORE_CHECKPOINT_KEY);
+    const transaction = database.transaction(["progress", "restore-checkpoints"], "readwrite");
+    const checkpoint = await transaction.objectStore("restore-checkpoints").get(RESTORE_CHECKPOINT_KEY);
+    const currentProgress = await transaction.objectStore("progress").get(PROGRESS_KEY);
+
+    if (
+      !checkpoint ||
+      checkpoint.token !== token ||
+      !progressesEqual(checkpoint.expectedProgress, expectedProgress) ||
+      !progressesEqual(currentProgress, expectedProgress)
+    ) {
+      await transaction.done;
+      return { status: "checkpoint-mismatch" };
+    }
+
+    await transaction.objectStore("restore-checkpoints").delete(RESTORE_CHECKPOINT_KEY);
     await transaction.done;
+    return { status: "finalized" };
   }
 
   public async reset(): Promise<void> {
@@ -167,4 +211,26 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
     return this.databasePromise;
   }
+}
+
+function progressesEqual(storedProgress: unknown, expectedProgress: LearnerProgressV1): boolean {
+  try {
+    return stableJson(migrateProgress(storedProgress)) === stableJson(expectedProgress);
+  } catch {
+    return false;
+  }
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
 }
