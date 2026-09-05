@@ -47,7 +47,7 @@ function buildBusinessExercises(
     type: "reading",
     promptZh: "阅读材料并回答问题。",
     readingText,
-    questions: questions.map((question) => ({ promptZh: question.promptZh, expectedAnswers: [...question.expectedAnswers] }))
+    questions: questions.map((question) => ({ id: question.id, promptZh: question.promptZh, expectedAnswers: [...question.expectedAnswers] }))
   }];
   if (activeSuffixes[0] !== undefined) exercises.push({ id: `${id}-personal-0`, type: "shadow", phraseId: `${id}-${activeSuffixes[0]}`, promptZh: "跟读自我介绍。" });
   if (activeSuffixes[1] !== undefined) exercises.push({ id: `${id}-personal-1`, type: "recall", phraseId: `${id}-${activeSuffixes[1]}`, promptZh: "不看提示，说出自我介绍。" });
@@ -60,7 +60,7 @@ const businessMissionSource: readonly Mission[] = [
     ["reply", "I will send it today.", "我今天会发送它。", "confirm-action", ["send", "today"], [["send"], ["today"]]],
     ["topic", "The email is about the file.", "这封邮件是关于文件的。", "identify-topic", ["email", "file"], [["email"], ["file"]]],
     ["deadline", "The deadline is Friday.", "截止日期是周五。", "identify-deadline", ["deadline", "Friday"], [["deadline"], ["Friday"]]],
-    ["sender", "The sender needs an answer.", "发件人需要答复。", "identify-sender-need", ["sender", "answer"], [["sender"], ["answer", "reply"]]],
+    ["sender", "The sender needs the file.", "发件人需要这份文件。", "identify-sender-need", ["sender", "file"], [["sender"], ["file"]]],
     ["repeat", "Could you send that again?", "您能再发一次吗？", "recover-message", ["send", "again"], [["send"], ["again", "repeat"]], true],
     ["work", "I work in the internet industry.", "我在互联网行业工作。", "self-introduction-work", ["internet", "industry"], [["work"], ["internet industry", "tech industry"]]],
     ["travel", "I am traveling in Italy and Switzerland.", "我正在意大利和瑞士旅行。", "self-introduction-travel", ["Italy", "Switzerland"], [["travel", "traveling"], ["Italy"], ["Switzerland"]]]
@@ -73,11 +73,11 @@ const businessMissionSource: readonly Mission[] = [
     ["what", "What changed today?", "今天有什么变化？", "identify-change", ["what", "changed"], [["change", "changed"], ["today"]]],
     ["simple", "Please use simple words.", "请用简单的词。", "recover-language", ["simple", "words"], [["simple"], ["words", "language"]], true]
   ]),
-  businessMission("message-intent", "消息意图：简短回复", 11, ["request", "information", "decision", "urgent"], "Mia: Could you check the plan today?\nLeo: Yes, I can check it.\nMia: I cannot join the meeting at 3.\nLeo: The meeting schedule changes to 4.\nMia: Next step: send the new time.", [{ id: "request", promptZh: "请求是什么？", expectedAnswers: ["check the plan"] }, { id: "confirmer", promptZh: "谁确认？", expectedAnswers: ["Leo"] }, { id: "unavailable-person", promptZh: "谁不能参加？", expectedAnswers: ["Mia"] }, { id: "new-time", promptZh: "会议改到几点？", expectedAnswers: ["4"] }, { id: "next-step", promptZh: "下一步是什么？", expectedAnswers: ["send the new time"] }], [], [
+  businessMission("message-intent", "消息意图：简短回复", 11, ["request", "information", "decision", "urgent"], "Mia: Could you check the plan today?\nLeo: Yes, I can check it.\nMia: I cannot join the meeting at 3.\nLeo: The meeting is now at 4.\nMia: Next step: send the new time.", [{ id: "request", promptZh: "请求是什么？", expectedAnswers: ["check the plan"] }, { id: "confirmer", promptZh: "谁确认？", expectedAnswers: ["Leo"] }, { id: "unavailable-person", promptZh: "谁不能参加？", expectedAnswers: ["Mia"] }, { id: "new-time", promptZh: "会议改到几点？", expectedAnswers: ["4"] }, { id: "next-step", promptZh: "下一步是什么？", expectedAnswers: ["send the new time"] }], [], [
     ["request", "Could you check this today?", "你今天能查看这个吗？", "identify-request", ["could", "today"], [["check"], ["today"]]],
     ["reply", "Yes, I can check it today.", "可以，我今天能查看。", "short-reply", ["yes", "today"], [["yes"], ["today"]]],
     ["info", "This is for your information.", "这是供你参考的信息。", "identify-information", ["information", "for you"], [["information", "info"]]],
-    ["decision", "We decided to use the new plan.", "我们决定使用新方案。", "identify-decision", ["decided", "plan"], [["decided", "decision"], ["plan"]]],
+    ["decision", "The meeting is now at 4.", "会议现在改到4点。", "identify-schedule-change", ["meeting", "4"], [["meeting"], ["4"]]],
     ["urgent", "This is urgent.", "这件事很紧急。", "identify-urgency", ["urgent", "now"], [["urgent"]]],
     ["clarify", "Could you tell me the next step?", "你能告诉我下一步吗？", "recover-next-step", ["next", "step"], [["next step"]], true]
   ])

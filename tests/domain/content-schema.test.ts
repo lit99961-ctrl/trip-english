@@ -71,7 +71,7 @@ describe("missionSchema", () => {
         intent: "read", keywords: ["read"], requiredKeywordGroups: [["read"]], recovery: index === 0
       })),
       recognitionWords: ["read"],
-      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE: Read this sign.", questions: [{ promptZh: "内容？", expectedAnswers: ["NOTICE"] }] }))
+      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读", readingText: "NOTICE: Read this sign.", questions: [{ id: "content", promptZh: "内容？", expectedAnswers: ["NOTICE"] }] }))
     };
 
     expect(missionSchema.safeParse({ ...base, kind: "business" }).success).toBe(false);
@@ -138,7 +138,7 @@ describe("missionSchema", () => {
     const business = {
       id: "strict-business", kind: "business", titleZh: "严格", city: "Reading", embeddedSession: 8,
       productionPhrases: phrases, recognitionWords: ["help"],
-      exercises: [{ id: "strict-reading", type: "reading", promptZh: "阅读", readingText: "HELP", questions: [{ promptZh: "什么？", expectedAnswers: ["HELP"] }] }]
+      exercises: [{ id: "strict-reading", type: "reading", promptZh: "阅读", readingText: "HELP", questions: [{ id: "content", promptZh: "什么？", expectedAnswers: ["HELP"] }] }]
     };
     expect(missionSchema.safeParse(business).success).toBe(true);
     expect(missionSchema.safeParse({ ...business, unknownMissionField: true }).success).toBe(false);
@@ -146,5 +146,27 @@ describe("missionSchema", () => {
       ...business,
       exercises: [{ ...business.exercises[0], questions: [{ ...business.exercises[0]!.questions[0], unknownQuestionField: true }] }]
     }).success).toBe(false);
+  });
+
+  it("rejects blank role-play values and malformed placeholder syntax", () => {
+    const phrase = {
+      id: "role-phrase", english: "I need two keys.", chinese: "我需要两把钥匙。", intent: "keys",
+      keywords: ["keys"], requiredKeywordGroups: [["keys"]], recovery: true
+    };
+    const validRoleplay = { id: "role", type: "roleplay", phraseId: "role-phrase", promptZh: "对话", variation: { keys: "two" }, promptTemplate: "I need {keys} keys." };
+    const mission = {
+      id: "role-mission", kind: "travel", titleZh: "对话", city: "Rome",
+      productionPhrases: Array.from({ length: 5 }, (_, index) => ({ ...phrase, id: index === 0 ? phrase.id : `${phrase.id}-${index}` })),
+      recognitionWords: ["keys"], exercises: Array.from({ length: 5 }, (_, index) => ({ ...validRoleplay, id: `${validRoleplay.id}-${index}` }))
+    };
+    const withRoleplay = (roleplay: Record<string, unknown>) => ({ ...mission, exercises: mission.exercises.map((exercise, index) => index === 0 ? roleplay : exercise) });
+
+    expect(missionSchema.safeParse(mission).success).toBe(true);
+    expect(missionSchema.safeParse(withRoleplay({ ...validRoleplay, variation: { keys: "" } })).success).toBe(false);
+    expect(missionSchema.safeParse(withRoleplay({ ...validRoleplay, variation: { keys: " " } })).success).toBe(false);
+    expect(missionSchema.safeParse(withRoleplay({ ...validRoleplay, variation: { " keys ": "two" } })).success).toBe(false);
+    expect(missionSchema.safeParse(withRoleplay({ ...validRoleplay, promptTemplate: "I need {keys}} keys." })).success).toBe(false);
+    expect(missionSchema.safeParse(withRoleplay({ ...validRoleplay, promptTemplate: "I need { keys } keys." })).success).toBe(false);
+    expect(missionSchema.safeParse(withRoleplay({ ...validRoleplay, promptTemplate: "I need {keys." })).success).toBe(false);
   });
 });

@@ -21,5 +21,9 @@ export function deepFreeze<T>(value: T, seen = new WeakSet<object>()): DeepReado
 }
 
 export function renderRoleplayPrompt(template: string, variation: Readonly<Record<string, string>>): string {
-  return template.replace(/\{([^}]+)\}/g, (_match, key: string) => variation[key] ?? `{${key}}`);
+  const rendered = template.replace(/\{([A-Za-z][A-Za-z0-9_]*)\}/g, (_match, key: string) => variation[key] ?? `{${key}}`);
+  if (/[{}]/u.test(rendered)) {
+    throw new Error("role-play prompt contains an unresolved or malformed placeholder");
+  }
+  return rendered;
 }

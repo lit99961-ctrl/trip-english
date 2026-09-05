@@ -28,7 +28,7 @@ export const emergencyPhraseSchema = z.object({
   english: z.string().min(1),
   chinese: z.string().min(1),
   keywords: z.array(z.string().min(1)).min(1)
-});
+}).strict();
 
 const emergencyPhraseSource = [
   { id: "em-airport-missed-flight", category: "airport", english: "I missed my flight. What can I do?", chinese: "我错过航班了。我该怎么办？", keywords: ["missed", "flight"] },

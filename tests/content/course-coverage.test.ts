@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { businessMissions } from "../../src/content/missions.business";
-import { emergencyPhrases, emergencyCategories } from "../../src/content/emergency-phrases";
+import { emergencyPhrases, emergencyCategories, emergencyPhraseSchema } from "../../src/content/emergency-phrases";
 import { travelMissions } from "../../src/content/missions.travel";
 import { allMissions, courseSessions, renderRoleplayPrompt } from "../../src/content/catalog";
 import { scoreTranscript } from "../../src/domain/functional-score";
@@ -282,6 +282,19 @@ describe("itinerary course coverage", () => {
     expect(message).toMatch(/next step/i);
   });
 
+  it("keeps corrected business interpretation phrases aligned with their readings", () => {
+    const sender = phraseById("email-action-sender");
+    expect(sender).toMatchObject({
+      english: "The sender needs the file.", chinese: "发件人需要这份文件。",
+      intent: "identify-sender-need", keywords: ["sender", "file"], requiredKeywordGroups: [["sender"], ["file"]]
+    });
+    const meeting = phraseById("message-intent-decision");
+    expect(meeting).toMatchObject({
+      english: "The meeting is now at 4.", chinese: "会议现在改到4点。",
+      intent: "identify-schedule-change", keywords: ["meeting", "4"], requiredKeywordGroups: [["meeting"], ["4"]]
+    });
+  });
+
   it("uses one complete reading artifact per business mission", () => {
     for (const mission of businessMissions) {
       const readings = mission.exercises.filter((exercise) => exercise.type === "reading");
@@ -314,6 +327,8 @@ describe("itinerary course coverage", () => {
 
   it("makes reading questions assessable and links personal active cards to practice", () => {
     for (const exercise of [...travelMissions, ...businessMissions].flatMap((mission) => mission.exercises).filter((item) => item.type === "reading")) {
+      expect(exercise.questions.every((question) => question.id.length > 0)).toBe(true);
+      expect(new Set(exercise.questions.map((question) => question.id)).size).toBe(exercise.questions.length);
       for (const question of exercise.questions) {
         expect(question.expectedAnswers.some((answer) => exercise.readingText.toLowerCase().includes(answer.toLowerCase()))).toBe(true);
       }
@@ -340,5 +355,6 @@ describe("itinerary course coverage", () => {
       expect(phrase.english).not.toMatch(/(?:@|e-?mail\s*:\s*\S+|\bemail\s*:\s*\S+|\btel\.?\s*:\s*\S+|\d{4,})/i);
       expect(phrase.keywords.length).toBeGreaterThan(0);
     }
+    expect(emergencyPhraseSchema.safeParse({ ...emergencyPhrases[0]!, unknownField: true }).success).toBe(false);
   });
 });

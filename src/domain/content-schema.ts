@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+const placeholderIdentifierPattern = /^[A-Za-z][A-Za-z0-9_]*$/;
+const placeholderPattern = /\{([A-Za-z][A-Za-z0-9_]*)\}/g;
+const trimmedNonemptyString = z.string().min(1).refine((value) => value === value.trim(), "value must be trimmed and nonempty");
+
 export const phraseSchema = z.object({
   id: z.string().min(1),
   english: z.string().min(1),
@@ -17,14 +21,22 @@ const exerciseSchema = z.discriminatedUnion("type", [
   z.object({ id: z.string(), type: z.literal("intent"), phraseId: z.string().optional(), promptZh: z.string().min(1) }).strict(),
   z.object({ id: z.string(), type: z.literal("shadow"), phraseId: z.string().optional(), promptZh: z.string().min(1) }).strict(),
   z.object({ id: z.string(), type: z.literal("recall"), phraseId: z.string().optional(), promptZh: z.string().min(1) }).strict(),
-  z.object({ id: z.string(), type: z.literal("roleplay"), phraseId: z.string().min(1), promptZh: z.string().min(1), variation: z.record(z.string(), z.string()).refine((value) => Object.keys(value).length > 0), promptTemplate: z.string().min(1) }).strict().superRefine((exercise, context) => {
-    const placeholders = [...exercise.promptTemplate.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]!);
+  z.object({ id: z.string(), type: z.literal("roleplay"), phraseId: z.string().min(1), promptZh: z.string().min(1), variation: z.record(z.string().regex(placeholderIdentifierPattern), trimmedNonemptyString).refine((value) => Object.keys(value).length > 0), promptTemplate: z.string().min(1) }).strict().superRefine((exercise, context) => {
+    const placeholders = [...exercise.promptTemplate.matchAll(placeholderPattern)].map((match) => match[1]!);
     const keys = Object.keys(exercise.variation);
-    if (placeholders.length === 0 || placeholders.some((key) => !keys.includes(key)) || keys.some((key) => !placeholders.includes(key))) {
+    if (/[{}]/u.test(exercise.promptTemplate.replace(placeholderPattern, ""))) {
+      context.addIssue({ code: "custom", message: "roleplay promptTemplate has malformed placeholders" });
+    }
+    if (placeholders.length === 0 || new Set(placeholders).size !== keys.length || placeholders.some((key) => !keys.includes(key)) || keys.some((key) => !placeholders.includes(key))) {
       context.addIssue({ code: "custom", message: "roleplay variation keys must match promptTemplate placeholders" });
     }
   }),
-  z.object({ id: z.string(), type: z.literal("reading"), phraseId: z.string().optional(), promptZh: z.string().min(1), readingText: z.string().min(1), questions: z.array(z.object({ promptZh: z.string().min(1), expectedAnswers: z.array(z.string().min(1)).min(1) }).strict()).min(1) }).strict()
+  z.object({ id: z.string(), type: z.literal("reading"), phraseId: z.string().optional(), promptZh: z.string().min(1), readingText: z.string().min(1), questions: z.array(z.object({ id: trimmedNonemptyString, promptZh: z.string().min(1), expectedAnswers: z.array(z.string().min(1)).min(1) }).strict()).min(1) }).strict().superRefine((exercise, context) => {
+    const ids = exercise.questions.map((question) => question.id);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: "custom", message: "reading question ids must be unique", path: ["questions"] });
+    }
+  })
 ]);
 
 const missionFields = {

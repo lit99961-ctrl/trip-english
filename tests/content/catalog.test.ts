@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allMissions, assertUnique, catalog, validateCatalog } from "../../src/content/catalog";
+import { allMissions, assertUnique, catalog, renderRoleplayPrompt, validateCatalog } from "../../src/content/catalog";
 import { deepFreeze } from "../../src/content/content-validation";
 
 function candidateMission(overrides: Record<string, unknown> = {}) {
@@ -21,7 +21,7 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
       { id: "hotel-shadow", type: "shadow", phraseId: "hotel-name", promptZh: "跟读姓名" },
       { id: "hotel-recall", type: "recall", phraseId: "hotel-room", promptZh: "回忆房间" },
       { id: "hotel-roleplay", type: "roleplay", phraseId: "hotel-key", promptZh: "索要房卡", variation: { keys: "two" }, promptTemplate: "I need {keys} keys." },
-      { id: "hotel-reading", type: "reading", phraseId: "hotel-thanks", promptZh: "朗读致谢", readingText: "HOTEL NOTICE: THANK YOU.", questions: [{ promptZh: "写了什么？", expectedAnswers: ["THANK YOU"] }] }
+      { id: "hotel-reading", type: "reading", phraseId: "hotel-thanks", promptZh: "朗读致谢", readingText: "HOTEL NOTICE: THANK YOU.", questions: [{ id: "message", promptZh: "写了什么？", expectedAnswers: ["THANK YOU"] }] }
     ],
     ...overrides
   };
@@ -99,5 +99,29 @@ describe("course catalog", () => {
         ? { ...exercise, promptTemplate: "I need {keys} passports." }
         : exercise)
     })])).toThrow("roleplay hotel-roleplay does not satisfy linked phrase hotel-key");
+  });
+
+  it("rejects malformed role-play templates and values at rendering and catalog boundaries", () => {
+    expect(() => renderRoleplayPrompt("I need {keys}}.", { keys: "two" })).toThrow("unresolved or malformed placeholder");
+    expect(() => renderRoleplayPrompt("I need { keys }.", { keys: "two" })).toThrow("unresolved or malformed placeholder");
+    expect(() => renderRoleplayPrompt("I need {keys.", { keys: "two" })).toThrow("unresolved or malformed placeholder");
+    expect(() => validateCatalog([candidateMission({
+      exercises: candidateMission().exercises.map((exercise) => exercise.type === "roleplay"
+        ? { ...exercise, promptTemplate: "I need {keys}}." }
+        : exercise)
+    })])).toThrow();
+    expect(() => validateCatalog([candidateMission({
+      exercises: candidateMission().exercises.map((exercise) => exercise.type === "roleplay"
+        ? { ...exercise, variation: { keys: " " } }
+        : exercise)
+    })])).toThrow();
+  });
+
+  it("rejects duplicate reading question IDs", () => {
+    expect(() => validateCatalog([candidateMission({
+      exercises: candidateMission().exercises.map((exercise) => exercise.type === "reading"
+        ? { ...exercise, questions: [exercise.questions![0], { ...exercise.questions![0] }] }
+        : exercise)
+    })])).toThrow("reading question ids must be unique");
   });
 });

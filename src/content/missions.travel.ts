@@ -38,7 +38,7 @@ function travelMission(
       { id: `${id}-shadow-2`, type: "shadow", phraseId: `${id}-${phrases[1]![0]}`, promptZh: "再跟读一句，换一个表达。" },
       { id: `${id}-recall`, type: "recall", phraseId: `${id}-${phrases[2]![0]}`, promptZh: "不看提示，说出这句话。" },
       { id: `${id}-roleplay`, type: "roleplay", phraseId: `${id}-${roleplayPhraseSuffix}`, promptZh: "按给定小变化完成一轮对话。", variation, promptTemplate },
-      { id: `${id}-reading`, type: "reading", phraseId: `${id}-${phrases[4]![0]}`, promptZh: "读一条现场标识或提示，找出关键信息。", readingText, questions: [{ promptZh: "标识中的关键信息是什么？", expectedAnswers: [readingText] }] }
+      { id: `${id}-reading`, type: "reading", phraseId: `${id}-${phrases[4]![0]}`, promptZh: "读一条现场标识或提示，找出关键信息。", readingText, questions: [{ id: "key-info", promptZh: "标识中的关键信息是什么？", expectedAnswers: [readingText] }] }
     ]
   };
 }
