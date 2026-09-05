@@ -27,7 +27,7 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
 }
 
 describe("course catalog", () => {
-  it("accepts the seed catalog and an explicit valid catalog", () => {
+  it("accepts the full catalog and an explicit valid catalog", () => {
     expect(validateCatalog()).toEqual(catalog);
     expect(validateCatalog([candidateMission()])).toHaveLength(1);
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missionSchema } from "../../src/domain/content-schema";
+import { missionSchema, phraseSchema } from "../../src/domain/content-schema";
 
 describe("missionSchema", () => {
   it("requires a recovery phrase and five to eight production phrases", () => {
@@ -50,5 +50,29 @@ describe("missionSchema", () => {
       ...mission,
       productionPhrases: [...mission.productionPhrases, { ...mission.productionPhrases[0]!, id: "extra" }, { ...mission.productionPhrases[0]!, id: "extra-2" }, { ...mission.productionPhrases[0]!, id: "extra-3" }, { ...mission.productionPhrases[0]!, id: "extra-4" }]
     }).success).toBe(false);
+  });
+
+  it("retains active targets and requires business embedded-session metadata", () => {
+    expect(phraseSchema.parse({
+      id: "target", english: "I need help.", chinese: "我需要帮助。", intent: "help", keywords: ["help"]
+    }).activeTarget).toBe(false);
+    expect(phraseSchema.parse({
+      id: "active-target", english: "I need help.", chinese: "我需要帮助。", intent: "help", keywords: ["help"], activeTarget: true
+    }).activeTarget).toBe(true);
+
+    const base = {
+      id: "reading", titleZh: "阅读", city: "Reading practice",
+      productionPhrases: Array.from({ length: 5 }, (_, index) => ({
+        id: `reading-${index}`, english: `Phrase ${index}`, chinese: `短语 ${index}`,
+        intent: "read", keywords: ["read"], recovery: index === 0
+      })),
+      recognitionWords: ["read"],
+      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `read-${index}`, type: "reading", promptZh: "阅读" }))
+    };
+
+    expect(missionSchema.safeParse({ ...base, kind: "business" }).success).toBe(false);
+    expect(missionSchema.safeParse({ ...base, kind: "business", embeddedSession: 8 }).success).toBe(true);
+    expect(missionSchema.safeParse({ ...base, kind: "business", embeddedSession: 5 }).success).toBe(false);
+    expect(missionSchema.safeParse({ ...base, kind: "travel", embeddedSession: 8 }).success).toBe(false);
   });
 });
