@@ -5,6 +5,9 @@ import { lookupText, renderEmergency } from "../features/emergency/emergency-vie
 import { renderHome } from "../features/home/home-view";
 import { renderLesson } from "../features/lesson/lesson-view";
 import { renderProgress } from "../features/progress/progress-view";
+import { renderSprint } from "../features/sprint/sprint-view";
+import { renderReview } from "../features/review/review-view";
+import { isDailyReviewSlot } from "../domain/daily-review";
 import { SelectionController } from "../selection/selection-controller";
 import type { SpeechPort } from "../speech/speech-port";
 import type { ProgressRepository } from "../storage/progress-repository";
@@ -83,9 +86,17 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
         } else {
           view = await renderHome({
             repository: dependencies.repository,
-            onStartMission: (missionId) => { window.location.hash = `#/lesson/${missionId}`; }
+            onStartMission: (missionId) => { window.location.hash = `#/lesson/${missionId}`; },
+            onStartSprint: () => { window.location.hash = "#/sprint"; },
+            onStartReview: (slot) => { window.location.hash = `#/review/${slot}`; }
           });
         }
+      } else if (route === "#/sprint") {
+        view = await renderSprint({
+          repository: dependencies.repository,
+          onStartMission: (missionId) => { window.location.hash = `#/sprint/lesson/${missionId}`; },
+          onComplete: () => { window.location.hash = "#/home"; }
+        });
       } else if (route === "#/emergency") {
         const progress = await dependencies.repository.load();
         view = renderEmergency({
@@ -106,6 +117,14 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
           }
           pendingLookup = "";
         }
+      } else if (route.startsWith("#/review/")) {
+        const slot = route.slice("#/review/".length);
+        if (!isDailyReviewSlot(slot)) throw new Error("invalid review slot");
+        const progress = await dependencies.repository.load();
+        view = renderReview({
+          slot, progress, repository: dependencies.repository, speech: dependencies.speech,
+          onComplete: () => { window.location.hash = "#/home"; }
+        });
       } else if (route === "#/progress") {
         view = await renderProgress({
           repository: dependencies.repository,
@@ -113,7 +132,8 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
           ...(dependencies.requestPersistence ? { requestPersistence: dependencies.requestPersistence } : {})
         });
       } else {
-        const missionId = route.slice("#/lesson/".length);
+        const fromSprint = route.startsWith("#/sprint/lesson/");
+        const missionId = route.slice(fromSprint ? "#/sprint/lesson/".length : "#/lesson/".length);
         const mission = allMissions.find((candidate) => candidate.id === missionId);
         if (!mission) {
           const invalid = document.createElement("section");
@@ -131,7 +151,7 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
             progress,
             speech: dependencies.speech,
             persistence: dependencies.repository,
-            onComplete: () => { window.location.hash = "#/home"; }
+            onComplete: () => { window.location.hash = fromSprint ? "#/sprint" : "#/home"; }
           });
         }
       }

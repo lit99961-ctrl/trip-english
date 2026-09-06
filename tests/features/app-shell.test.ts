@@ -12,6 +12,10 @@ function dependencies(progress = createLearnerProgressV1()) {
   const repository: ProgressRepository = {
     load: vi.fn(async () => progress), saveExerciseResult: vi.fn(), saveCalibrationResult: vi.fn(),
     savePhraseId: vi.fn(async () => progress), saveLookup: vi.fn(async () => progress),
+    ensureDailyPlan: vi.fn(async (date, missionIds) => {
+      progress.dailyPlans = { ...(progress.dailyPlans ?? {}), [date]: { missionIds: [...missionIds] } };
+      return progress;
+    }),
     saveRecording: vi.fn(), loadRecording: vi.fn(), beginRestore: vi.fn(), rollbackRestore: vi.fn(),
     finalizeRestore: vi.fn(), reset: vi.fn(), close: vi.fn()
   };
@@ -62,7 +66,7 @@ describe("app shell", () => {
     app.dispose();
   });
 
-  it("deep-links to a validated lesson and browser back returns home", async () => {
+  it("opens the daily sprint, deep-links its lesson and browser back returns to the sprint", async () => {
     const { repository, speech } = dependencies();
     window.location.hash = "#/home";
     const app = createApp({ repository, speech });
@@ -70,13 +74,16 @@ describe("app shell", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     app.querySelector<HTMLButtonElement>("button.primary-action")!.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(window.location.hash).toBe("#/lesson/hk-checkin");
+    expect(window.location.hash).toBe("#/sprint");
+    app.querySelector<HTMLButtonElement>("button.primary-action")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(window.location.hash).toBe("#/sprint/lesson/hk-checkin");
     expect(app.querySelector(".lesson-view")).not.toBeNull();
 
     window.history.back();
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(window.location.hash).toBe("#/home");
-    expect(app.querySelector(".home-view")).not.toBeNull();
+    expect(window.location.hash).toBe("#/sprint");
+    expect(app.querySelector(".sprint-view")).not.toBeNull();
     app.dispose();
   });
 

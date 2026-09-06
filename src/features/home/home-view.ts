@@ -1,15 +1,20 @@
 import { courseSessions } from "../../content/catalog";
+import { travelMissions } from "../../content/missions.travel";
 import type { DeepReadonly } from "../../content/content-validation";
 import type { Mission } from "../../domain/content-schema";
+import { localDateKey, selectDailyMissions } from "../../domain/daily-plan";
+import type { DailyReviewSlot } from "../../domain/daily-review";
 import type { LearnerProgressV1 } from "../../domain/progress";
 import type { ProgressRepository } from "../../storage/progress-repository";
 
-type HomeRepository = Pick<ProgressRepository, "load">;
+type HomeRepository = Pick<ProgressRepository, "load"> & Partial<Pick<ProgressRepository, "ensureDailyPlan">>;
 
 export interface HomeViewOptions {
   repository: HomeRepository;
   now?: () => Date;
   onStartMission?: (missionId: string) => void;
+  onStartSprint?: () => void;
+  onStartReview?: (slot: DailyReviewSlot) => void;
 }
 
 const masteryLabels = {
@@ -101,6 +106,12 @@ export async function renderHome(options: HomeViewOptions): Promise<HTMLElement>
   const mission = missionForSession(progress, sessionIndex);
   const dueCount = Object.values(progress.phraseReviews)
     .filter((review) => new Date(review.dueAt).getTime() <= now.getTime()).length;
+  const date = localDateKey(now);
+  const suggestedMissionIds = progress.dailyPlans?.[date]?.missionIds ?? selectDailyMissions(progress, travelMissions, now);
+  if (!progress.dailyPlans?.[date] && options.repository.ensureDailyPlan) {
+    progress = await options.repository.ensureDailyPlan(date, suggestedMissionIds);
+  }
+  const dailyMissionIds = progress.dailyPlans?.[date]?.missionIds ?? suggestedMissionIds;
 
   const eyebrow = document.createElement("p");
   eyebrow.className = "eyebrow";
@@ -138,14 +149,46 @@ export async function renderHome(options: HomeViewOptions): Promise<HTMLElement>
   const start = document.createElement("button");
   start.type = "button";
   start.className = "primary-action";
-  start.textContent = "开始今日任务";
+  start.textContent = "开始 / 继续今天的 30 分钟训练";
   start.addEventListener("click", () => {
-    if (options.onStartMission) options.onStartMission(mission.id);
+    if (options.onStartSprint) options.onStartSprint();
+    else if (options.onStartMission) options.onStartMission(mission.id);
     else root.dispatchEvent(new CustomEvent("app:start-mission", {
       bubbles: true,
       detail: { missionId: mission.id }
     }));
   });
-  root.append(eyebrow, heading, route, review, start);
+  const daily = document.createElement("section");
+  daily.className = "daily-plan-card";
+  const dailyHeading = document.createElement("h2");
+  dailyHeading.textContent = "今天 3 个实用场景";
+  const dailyList = document.createElement("ol");
+  dailyMissionIds.forEach((id) => {
+    const item = document.createElement("li");
+    item.textContent = travelMissions.find((candidate) => candidate.id === id)?.titleZh ?? id;
+    dailyList.append(item);
+  });
+  daily.append(dailyHeading, dailyList);
+  const reviews = document.createElement("section");
+  reviews.className = "daily-review-grid";
+  const reviewHeading = document.createElement("h2");
+  reviewHeading.textContent = "三次碎片复习 · 每次 2 分钟";
+  reviews.append(reviewHeading);
+  (["morning", "midday", "evening"] as const).forEach((slot, index) => {
+    const exerciseId = `${date}-${slot}`;
+    const completed = progress.sessions["daily-review"]?.completedExerciseIds.includes(exerciseId) ?? false;
+    const card = document.createElement("article");
+    const title = document.createElement("h3");
+    title.textContent = `${["早晨", "午间", "晚上"][index]} · 2 分钟`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary-action";
+    button.textContent = completed ? "已完成" : "开始复习";
+    button.disabled = completed;
+    button.addEventListener("click", () => options.onStartReview?.(slot));
+    card.append(title, button);
+    reviews.append(card);
+  });
+  root.append(eyebrow, heading, daily, start, reviews, route, review);
   return root;
 }

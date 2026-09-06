@@ -1,10 +1,14 @@
 export const appRoutes = ["#/home", "#/emergency", "#/progress"] as const;
-export type AppRoute = typeof appRoutes[number] | `#/lesson/${string}`;
+export type AppRoute = typeof appRoutes[number] | "#/sprint" | `#/review/${"morning" | "midday" | "evening"}` | `#/lesson/${string}` | `#/sprint/lesson/${string}`;
 const routes = new Set<string>(appRoutes);
 const lessonRoutePattern = /^#\/lesson\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const sprintLessonRoutePattern = /^#\/sprint\/lesson\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const reviewRoutePattern = /^#\/review\/(?:morning|midday|evening)$/;
 
 export function currentRoute(): AppRoute {
-  return routes.has(window.location.hash) || lessonRoutePattern.test(window.location.hash)
+  return routes.has(window.location.hash) || window.location.hash === "#/sprint"
+    || lessonRoutePattern.test(window.location.hash) || sprintLessonRoutePattern.test(window.location.hash)
+    || reviewRoutePattern.test(window.location.hash)
     ? window.location.hash as AppRoute
     : "#/home";
 }

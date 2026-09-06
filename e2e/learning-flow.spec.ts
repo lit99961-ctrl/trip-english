@@ -10,6 +10,10 @@ test("calibrates, completes a hotel mission, and resumes measured progress", asy
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "2 分钟起点小游戏" })).toBeVisible();
   await completeCalibration(page);
+  await page.getByRole("button", { name: /30 分钟训练/ }).click();
+  await expect(page.getByRole("heading", { name: "今天的 30 分钟训练" })).toBeVisible();
+  await expect(page.locator(".daily-plan-list li")).toHaveCount(3);
+  await page.goBack();
   await page.getByRole("link", { name: "进度" }).click();
   await expect(page.getByText(/持久存储|定期备份/)).toBeVisible();
 
@@ -20,11 +24,13 @@ test("calibrates, completes a hotel mission, and resumes measured progress", asy
   await expect(page.getByText("已练习", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "进度" }).click();
-  await expect(page.getByText("0 / 30", { exact: true })).toBeVisible();
+  await expect(page.getByText("0 / 33", { exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "听懂意思" })).toBeVisible();
 
   await page.locator('input[type="radio"]').first().check();
+  await page.getByRole("button", { name: "检查答案", exact: true }).click();
+  await expect(page.getByText(/听懂了|正确意思/)).toBeVisible();
   await page.getByRole("button", { name: "继续", exact: true }).click();
   await completeCurrentSpeakingExercise(page);
   await completeCurrentSpeakingExercise(page);
@@ -43,4 +49,16 @@ test("calibrates, completes a hotel mission, and resumes measured progress", asy
   await page.reload();
   await expect(page.getByText(/待复习 [1-9]/)).toBeVisible();
   await expect(page.getByText(/练习中 \d+\/15/)).toBeVisible();
+});
+
+test("completes a two-minute morning review and keeps it completed", async ({ page }) => {
+  await page.goto("/");
+  await completeCalibration(page);
+  await page.getByRole("button", { name: "开始复习" }).first().click();
+  await expect(page.getByRole("heading", { name: "早晨 2 分钟复习" })).toBeVisible();
+  await page.getByRole("button", { name: "说完了，显示答案" }).click();
+  await page.locator("select").selectOption("yes");
+  await page.getByRole("button", { name: "保存复习" }).click();
+  await expect(page.getByRole("heading", { name: /香港机场值机/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "已完成" })).toHaveCount(1);
 });

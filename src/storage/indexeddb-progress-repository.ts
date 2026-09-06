@@ -300,6 +300,32 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     return next;
   }
 
+  public async ensureDailyPlan(
+    date: string,
+    missionIds: readonly [string, string, string]
+  ): Promise<LearnerProgressV1> {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || new Set(missionIds).size !== 3 || missionIds.some((id) => !id.trim())) {
+      throw new Error("daily plan input is invalid");
+    }
+    const database = await this.getDatabase();
+    const transaction = database.transaction("progress", "readwrite");
+    const progress = projectReviewHistory(migrateProgress(await transaction.store.get(PROGRESS_KEY), this.now()));
+    if (progress.dailyPlans?.[date]) {
+      await transaction.done;
+      return progress;
+    }
+    const retained = Object.fromEntries(Object.entries(progress.dailyPlans ?? {})
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 30));
+    const next = migrateProgress({
+      ...progress,
+      dailyPlans: { ...retained, [date]: { missionIds: [...missionIds] } }
+    }, this.now());
+    await transaction.store.put(next, PROGRESS_KEY);
+    await transaction.done;
+    return next;
+  }
+
   public async saveRecording(key: string, recording: Blob): Promise<void> {
     const database = await this.getDatabase();
     await database.put("recordings", recording, key);

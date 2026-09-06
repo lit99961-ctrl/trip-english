@@ -957,4 +957,13 @@ describe("IndexedDbProgressRepository", () => {
     await repository.saveExerciseResult({ missionId: "taxi", exerciseId: "roleplay-1" });
     await expect(repository.load()).resolves.toMatchObject({ activeMissionId: "taxi" });
   });
+
+  test("keeps the first daily plan stable for a date", async () => {
+    const repository = createRepository();
+    const first = await repository.ensureDailyPlan("2026-09-05", ["hotel", "train", "restaurant"]);
+    const second = await repository.ensureDailyPlan("2026-09-05", ["airport", "shopping", "emergency"]);
+
+    expect(first.dailyPlans?.["2026-09-05"]?.missionIds).toEqual(["hotel", "train", "restaurant"]);
+    expect(second.dailyPlans?.["2026-09-05"]?.missionIds).toEqual(["hotel", "train", "restaurant"]);
+  });
 });

@@ -300,6 +300,8 @@ describe("speaking-first lesson", () => {
     await click(view); // finish active review
     expectOnePrimary();
     view.querySelector<HTMLInputElement>('input[value="answer"]')!.click();
+    await click(view); // check comprehension
+    expect(view.textContent).toContain("听懂了");
     await click(view); // finish comprehension
 
     for (let speakingExercise = 0; speakingExercise < 3; speakingExercise += 1) {
@@ -441,6 +443,8 @@ describe("speaking-first lesson", () => {
     buttons.find((button) => button.textContent === "显示文字")!.click();
     expect(view.textContent).toContain(scenario.transcript);
     view.querySelector<HTMLInputElement>('input[value="answer"]')!.click();
+    await click(view);
+    expect(view.textContent).toContain("听懂了");
     await click(view);
 
     expect(persistence.saveExerciseResult).toHaveBeenCalledWith(expect.objectContaining({

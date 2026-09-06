@@ -11,6 +11,7 @@ function repository(progress = createLearnerProgressV1()): ProgressRepository {
     load: vi.fn(async () => progress),
     saveExerciseResult: vi.fn(), saveCalibrationResult: vi.fn(),
     savePhraseId: vi.fn(async () => progress), saveLookup: vi.fn(async () => progress),
+    ensureDailyPlan: vi.fn(async () => progress),
     saveRecording: vi.fn(async () => undefined), loadRecording: vi.fn(async () => undefined),
     beginRestore: vi.fn(async () => "restore-token"),
     rollbackRestore: vi.fn(async () => ({ status: "rolled-back" as const })),

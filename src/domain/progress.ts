@@ -52,6 +52,11 @@ const lookupHistoryEntrySchema = z.object({
   savedAt: isoDateTime
 }).strict();
 
+const dailyPlanSchema = z.object({
+  missionIds: z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)])
+    .refine((ids) => new Set(ids).size === ids.length, "daily plan missions must be unique")
+}).strict();
+
 export const learnerProgressV1Schema = z.object({
   schemaVersion: z.literal(1),
   startedAt: isoDateTime,
@@ -61,6 +66,7 @@ export const learnerProgressV1Schema = z.object({
   savedPhraseIds: z.array(z.string()),
   knownWords: z.array(z.string().regex(/^[a-z]+(?:'[a-z]+)?$/)).optional(),
   lookupHistory: z.array(lookupHistoryEntrySchema).max(50).optional(),
+  dailyPlans: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), dailyPlanSchema).optional(),
   speakingSeconds: z.number().nonnegative(),
   hintCount: z.number().int().nonnegative(),
   promptFreeScenarioIds: z.array(z.string()),

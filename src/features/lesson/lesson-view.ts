@@ -181,6 +181,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
   let lastAttemptClass = latestAttemptClass(state);
   let saveError: string | undefined;
   let activeReviewRevealed = false;
+  let comprehensionResult: boolean | undefined;
   let readingChecked = false;
   let readingPassed = false;
   let recording: RecordingSession | undefined;
@@ -468,8 +469,18 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         { value: "answer", label: phrase?.intent ?? "这句话的用途" },
         { value: "other", label: "其他意思" }
       ], `comprehension-${exercise.id}`);
-      root.append(choices);
-      primary.textContent = "继续";
+      if (comprehensionResult === undefined) {
+        root.append(choices);
+        primary.textContent = "检查答案";
+      } else {
+        const feedback = document.createElement("p");
+        feedback.setAttribute("role", "status");
+        feedback.textContent = comprehensionResult
+          ? "听懂了！继续下一步。"
+          : `正确意思：${scenario?.meaningZh ?? phrase?.intent ?? "请再听一次"}`;
+        root.append(feedback);
+        primary.textContent = "继续";
+      }
       primary.addEventListener("click", async () => {
         primary.disabled = true;
         if (pendingCompletion) {
@@ -477,9 +488,14 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           render();
           return;
         }
-        const selected = choices.querySelector<HTMLInputElement>('input[type="radio"]:checked');
-        if (!selected) {
-          primary.disabled = false;
+        if (comprehensionResult === undefined) {
+          const selected = choices.querySelector<HTMLInputElement>('input[type="radio"]:checked');
+          if (!selected) {
+            primary.disabled = false;
+            return;
+          }
+          comprehensionResult = selected.value === "answer";
+          render();
           return;
         }
         let candidateState = state;
@@ -487,7 +503,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         if (phrase) {
           candidateState = recordPhraseAttempt(definition, state, phrase.id, {
             attemptId: createAttemptId(),
-            passed: selected.value === "answer",
+            passed: comprehensionResult,
             answerRevealed: true,
             supportLevel: "full",
             hintCount: 1,

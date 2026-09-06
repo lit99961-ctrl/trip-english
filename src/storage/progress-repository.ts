@@ -51,6 +51,7 @@ export interface ProgressRepository {
   saveCalibrationResult(input: SaveCalibrationResultInput): Promise<LearnerProgressV1>;
   savePhraseId(phraseId: string): Promise<LearnerProgressV1>;
   saveLookup(input: SaveLookupInput): Promise<LearnerProgressV1>;
+  ensureDailyPlan(date: string, missionIds: readonly [string, string, string]): Promise<LearnerProgressV1>;
   saveRecording(key: string, recording: Blob): Promise<void>;
   loadRecording(key: string): Promise<Blob | undefined>;
   beginRestore(progress: LearnerProgressV1): Promise<RestoreToken>;
