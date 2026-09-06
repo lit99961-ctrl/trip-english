@@ -11,7 +11,6 @@ export const phraseSchema = z.object({
   phonetic: z.string().optional(),
   intent: z.string().min(1),
   keywords: z.array(z.string().min(1)).min(1),
-  audio: z.string().startsWith("/audio/").optional(),
   recovery: z.boolean().default(false),
   activeTarget: z.boolean().default(false),
   requiredKeywordGroups: z.array(z.array(z.string().min(1)).min(1)).min(1)

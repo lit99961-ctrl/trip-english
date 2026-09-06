@@ -27,7 +27,7 @@ export interface LookupResult {
 }
 
 export interface EmergencyViewOptions {
-  speech: Pick<SpeechPort, "playFixed" | "speak">;
+  speech: Pick<SpeechPort, "speak">;
   dictionary?: readonly DictionaryEntry[];
   clipboard?: Pick<Clipboard, "writeText">;
   savedPhraseIds?: readonly string[];
@@ -143,10 +143,10 @@ export function renderEmergency(options: EmergencyViewOptions): HTMLElement {
       chinese.textContent = phrase.chinese;
       const actions = document.createElement("div");
       actions.className = "compact-actions";
-      const normal = button("播放", () => invoke(() => options.speech.playFixed(phrase.audio, 1), "播放完成。"));
+      const normal = button("播放", () => invoke(() => options.speech.speak(phrase.english, 1), "播放完成。"));
       normal.dataset.rate = "normal";
       normal.setAttribute("aria-label", `正常播放：${phrase.english}`);
-      const slow = button("慢速", () => invoke(() => options.speech.playFixed(phrase.audio, 0.75), "播放完成。"));
+      const slow = button("慢速", () => invoke(() => options.speech.speak(phrase.english, 0.75), "播放完成。"));
       slow.dataset.rate = "slow";
       slow.setAttribute("aria-label", `慢速播放：${phrase.english}`);
       const copyButton = button("复制", () => copy(phrase.english));

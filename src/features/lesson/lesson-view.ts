@@ -384,7 +384,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           listen.type = "button";
           listen.className = "secondary-action";
           listen.textContent = "播放答案";
-          listen.addEventListener("click", () => playWithFeedback(() => speech.playFixed(phrase.audio!, 1)));
+          listen.addEventListener("click", () => playWithFeedback(() => speech.speak(phrase.english, 1)));
           root.append(answer, listen);
         }
         const rating = choiceField([
@@ -429,7 +429,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         listen.type = "button";
         listen.className = "secondary-action";
         listen.textContent = "播放英文";
-        listen.addEventListener("click", () => playWithFeedback(() => speech.playFixed(phrase.audio!, 1)));
+        listen.addEventListener("click", () => playWithFeedback(() => speech.speak(phrase.english, 1)));
         root.append(listen);
       }
       const choices = choiceField([
@@ -553,7 +553,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         listen.className = "secondary-action";
         listen.textContent = "听示范";
         listen.setAttribute("aria-label", `播放示范：${phrase.english}`);
-        listen.addEventListener("click", () => playWithFeedback(() => speech.playFixed(phrase.audio!, 1)));
+        listen.addEventListener("click", () => playWithFeedback(() => speech.speak(phrase.english, 1)));
         root.append(english);
         if (support === "full") root.append(chinese);
         if (support !== "prompt-only") root.append(listen);

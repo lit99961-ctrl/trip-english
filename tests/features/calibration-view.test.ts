@@ -23,7 +23,6 @@ function chooseFirst(view: HTMLElement): void {
 function speechFixture(): SpeechPort {
   const recording: RecordingSession = { stop: vi.fn(async () => new Blob(["voice"], { type: "audio/webm" })) };
   return {
-    playFixed: vi.fn(async () => undefined),
     speak: vi.fn(async () => undefined),
     startRecording: vi.fn(async () => recording),
     recognize: vi.fn(async () => null),

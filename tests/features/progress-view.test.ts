@@ -21,7 +21,7 @@ function repository(progress = createLearnerProgressV1()): ProgressRepository {
 
 function speech(): SpeechPort {
   return {
-    playFixed: vi.fn(), speak: vi.fn(), recognize: vi.fn(),
+    speak: vi.fn(), recognize: vi.fn(),
     recognitionMode: vi.fn(async () => "self-rating" as const),
     startRecording: vi.fn(async () => ({ stop: async () => new Blob(["final"]) }))
   };

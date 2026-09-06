@@ -13,7 +13,7 @@ const hotel = allMissions.find((mission) => mission.id === "hotel-checkin")!;
 function fixture(recognition: { transcript: string; confidence: number | null } | null = null) {
   const recording: RecordingSession = { stop: vi.fn(async () => new Blob(["voice"], { type: "audio/webm" })) };
   const speech: SpeechPort = {
-    playFixed: vi.fn(async () => undefined), speak: vi.fn(async () => undefined),
+    speak: vi.fn(async () => undefined),
     startRecording: vi.fn(async () => recording), recognize: vi.fn(async () => recognition),
     recognitionMode: vi.fn(async () => recognition ? "automatic" : "self-rating")
   };
@@ -397,9 +397,9 @@ describe("speaking-first lesson", () => {
     }));
   });
 
-  it("reports model-audio playback rejection without an unhandled promise", async () => {
+  it("reports runtime speech rejection without an unhandled promise", async () => {
     const { speech, persistence } = fixture();
-    speech.playFixed = vi.fn(async () => { throw new Error("decode"); });
+    speech.speak = vi.fn(async () => { throw new Error("unavailable"); });
     const progress = createLearnerProgressV1();
     progress.sessions[hotel.id] = {
       missionId: hotel.id,

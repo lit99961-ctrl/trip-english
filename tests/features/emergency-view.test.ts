@@ -16,7 +16,6 @@ const dictionary: readonly DictionaryEntry[] = [
 
 function speech(): SpeechPort {
   return {
-    playFixed: vi.fn(async () => undefined),
     speak: vi.fn(async () => undefined),
     startRecording: vi.fn(),
     recognize: vi.fn(),
@@ -34,7 +33,7 @@ describe("emergency kit and light lookup", () => {
     expect(result.canCopyForSystemTranslation).toBe(true);
   });
 
-  it("filters all 50 cards and plays fixed audio at normal or slow speed", async () => {
+  it("filters all 50 cards and speaks text at normal or slow speed", async () => {
     const audio = speech();
     const view = renderEmergency({ speech: audio, dictionary });
     document.body.append(view);
@@ -49,8 +48,8 @@ describe("emergency kit and light lookup", () => {
     buttons[1]!.click();
     await Promise.resolve();
     const phrase = emergencyPhrases.find((item) => item.english.includes("ambulance"))!;
-    expect(audio.playFixed).toHaveBeenNthCalledWith(1, phrase.audio, 1);
-    expect(audio.playFixed).toHaveBeenNthCalledWith(2, phrase.audio, 0.75);
+    expect(audio.speak).toHaveBeenNthCalledWith(1, phrase.english, 1);
+    expect(audio.speak).toHaveBeenNthCalledWith(2, phrase.english, 0.75);
   });
 
   it("gives repeated card controls a phrase-specific accessible name", () => {

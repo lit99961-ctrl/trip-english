@@ -3,7 +3,6 @@ import type { RecognitionResult, RecordingSession, SpeechPort } from "./speech-p
 export type SpeechFailureCode =
   | "unsupported"
   | "invalid-text"
-  | "playback-failed"
   | "synthesis-failed"
   | "cancelled"
   | "permission-denied"
@@ -23,10 +22,6 @@ type EventListener = (event: any) => void;
 interface EventSource {
   addEventListener(type: string, listener: EventListener): void;
   removeEventListener(type: string, listener: EventListener): void;
-}
-interface AudioSource extends EventSource {
-  playbackRate: number;
-  play(): Promise<void>;
 }
 interface Synthesis {
   cancel(): void;
@@ -57,7 +52,6 @@ interface Recognition extends EventSource {
 type Ctor<T> = new (...args: any[]) => T;
 
 export interface BrowserSpeechDependencies {
-  createAudio?: ((src: string) => AudioSource) | undefined;
   speechSynthesis?: Synthesis | undefined;
   SpeechSynthesisUtterance?: Ctor<Utterance> | undefined;
   getUserMedia?: ((constraints: MediaStreamConstraints) => Promise<MediaStream>) | undefined;
@@ -76,7 +70,6 @@ function browserDefaults(): BrowserSpeechDependencies {
   };
   const browserNavigator = typeof navigator === "undefined" ? undefined : navigator;
   return {
-    createAudio: typeof Audio === "undefined" ? undefined : (src) => new Audio(src) as unknown as AudioSource,
     speechSynthesis: browserWindow?.speechSynthesis as unknown as Synthesis | undefined,
     SpeechSynthesisUtterance: browserWindow?.SpeechSynthesisUtterance as unknown as Ctor<Utterance> | undefined,
     getUserMedia: browserNavigator?.mediaDevices?.getUserMedia?.bind(browserNavigator.mediaDevices),
@@ -107,26 +100,6 @@ export class BrowserSpeech implements SpeechPort {
 
   async recognitionMode(): Promise<"automatic" | "self-rating"> {
     return this.dependencies.SpeechRecognition ? "automatic" : "self-rating";
-  }
-
-  async playFixed(src: string, rate: 1 | 0.75): Promise<void> {
-    if (!src.trim() || !validRate(rate)) throw capabilityError("playback-failed", "A valid audio source and rate are required.");
-    const factory = this.dependencies.createAudio;
-    if (!factory) throw capabilityError("unsupported", "Audio playback is unavailable.");
-    const audio = factory(src);
-    audio.playbackRate = rate;
-    return new Promise<void>((resolve, reject) => {
-      const finish = (error?: SpeechCapabilityError) => {
-        audio.removeEventListener("ended", ended);
-        audio.removeEventListener("error", failed);
-        error ? reject(error) : resolve();
-      };
-      const ended = () => finish();
-      const failed = () => finish(capabilityError("playback-failed", "Audio playback failed."));
-      audio.addEventListener("ended", ended);
-      audio.addEventListener("error", failed);
-      void audio.play().catch(() => failed());
-    });
   }
 
   async speak(text: string, rate: 1 | 0.75): Promise<void> {

@@ -29,13 +29,13 @@ function candidateMission(overrides: Record<string, unknown> = {}) {
 }
 
 describe("course catalog", () => {
-  it("attaches fixed local audio to every production and emergency phrase", () => {
+  it("keeps authored phrases text-only so third-party voices are never redistributed", () => {
     const phrases = allMissions.flatMap((mission) => mission.productionPhrases);
 
     expect(phrases).toHaveLength(100);
     expect(emergencyPhrases).toHaveLength(50);
     expect([...phrases, ...emergencyPhrases].every((phrase) =>
-      typeof phrase.audio === "string" && phrase.audio.startsWith("/audio/")
+      !("audio" in phrase)
     )).toBe(true);
   });
 

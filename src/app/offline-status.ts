@@ -1,6 +1,6 @@
 import type { SpeechPort } from "../speech/speech-port";
 
-const REQUIRED_GROUP_COUNT = 3;
+const REQUIRED_GROUP_COUNT = 2;
 
 export interface OfflineInputs {
   online: boolean;
@@ -15,16 +15,17 @@ export interface OfflineState {
 }
 
 export function deriveOfflineState(input: OfflineInputs): OfflineState {
-  if (!input.online && input.fixedAssetsReady) {
+  const readyGroups = Math.max(0, Math.min(REQUIRED_GROUP_COUNT, input.readyGroups ?? 0));
+  const ready = input.fixedAssetsReady || readyGroups === REQUIRED_GROUP_COUNT;
+  if (!input.online && ready) {
     return { lessonsAvailable: true, recognitionAvailable: false, label: "离线可学习" };
   }
   if (!input.online) {
     return { lessonsAvailable: false, recognitionAvailable: false, label: "首次使用需联网下载" };
   }
-  if (input.fixedAssetsReady) {
+  if (ready) {
     return { lessonsAvailable: true, recognitionAvailable: true, label: "离线内容已就绪" };
   }
-  const readyGroups = Math.max(0, Math.min(REQUIRED_GROUP_COUNT, input.readyGroups ?? 0));
   return {
     lessonsAvailable: true,
     recognitionAvailable: true,
@@ -60,8 +61,7 @@ export async function countReadyOfflineGroups(
   const hasIndex = paths.has(`${normalizedBase}index.html`);
   const hasStyle = [...paths].some((path) => path.startsWith(`${normalizedBase}assets/`) && path.endsWith(".css"));
   const hasApplicationBundle = [...paths].some((path) => path.startsWith(`${normalizedBase}assets/`) && path.endsWith(".js"));
-  const audioCount = [...paths].filter((path) => path.startsWith(`${normalizedBase}audio/`) && path.endsWith(".aiff")).length;
-  return Number(hasIndex && hasStyle) + Number(hasApplicationBundle) + Number(audioCount === 150);
+  return Number(hasIndex && hasStyle) + Number(hasApplicationBundle);
 }
 
 export function mountOfflineStatus(
@@ -110,20 +110,12 @@ export function mountOfflineStatus(
 
 export function createOfflineAwareSpeech(
   speech: SpeechPort,
-  isOnline: () => boolean = () => navigator.onLine,
-  baseUrl = import.meta.env.BASE_URL
+  isOnline: () => boolean = () => navigator.onLine
 ): SpeechPort {
   return {
-    playFixed: (src, rate) => speech.playFixed(resolveAppAssetPath(src, baseUrl), rate),
     speak: (text, rate) => speech.speak(text, rate),
     startRecording: () => speech.startRecording(),
     recognitionMode: () => isOnline() ? speech.recognitionMode() : Promise.resolve("self-rating"),
     recognize: (language) => isOnline() ? speech.recognize(language) : Promise.resolve(null)
   };
-}
-
-export function resolveAppAssetPath(source: string, baseUrl: string): string {
-  if (!source.startsWith("/audio/")) return source;
-  const normalizedBase = `/${baseUrl.split("/").filter(Boolean).join("/")}`;
-  return `${normalizedBase === "/" ? "" : normalizedBase}${source}`;
 }

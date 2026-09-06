@@ -42,5 +42,5 @@ A small audited manual map applies course-context meanings to proper names (whil
 available ECDICT phonetics) and supplies variants when the pinned source has no usable translated
 entry. The generated dictionary contains exactly 1,000 entries.
 
-The AIFF speech files in `public/audio` are generated locally with the macOS Samantha system
-voice. They are not sourced from ECDICT.
+The project does not redistribute generated system-voice recordings. English playback is
+requested at runtime through the user's browser or operating system.

@@ -16,7 +16,7 @@ function dependencies(progress = createLearnerProgressV1()) {
     finalizeRestore: vi.fn(), reset: vi.fn(), close: vi.fn()
   };
   const speech: SpeechPort = {
-    playFixed: vi.fn(), speak: vi.fn(), startRecording: vi.fn(), recognize: vi.fn(),
+    speak: vi.fn(), startRecording: vi.fn(), recognize: vi.fn(),
     recognitionMode: vi.fn(async () => "self-rating" as const)
   };
   return { repository, speech };

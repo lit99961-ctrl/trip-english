@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -66,16 +66,6 @@ function listAiffFiles(path: string): string[] {
   } catch {
     return [];
   }
-}
-
-function aiffChunkIds(bytes: Buffer): string[] {
-  const chunks: string[] = [];
-  for (let offset = 12; offset + 8 <= bytes.length;) {
-    chunks.push(bytes.subarray(offset, offset + 4).toString("ascii"));
-    const size = bytes.readUInt32BE(offset + 4);
-    offset += 8 + size + (size % 2);
-  }
-  return chunks;
 }
 
 describe("generated offline dictionary", () => {
@@ -260,76 +250,16 @@ describe("generated offline dictionary", () => {
   });
 });
 
-describe("fixed audio assets", () => {
-  it("exposes a validated manifest and rejects unsafe content IDs", () => {
-    const exports = courseCatalog as typeof courseCatalog & {
-      fixedAudioPhrases?: readonly { id: string; english: string; audio: string }[];
-      contentIdToAudioSlug?: (id: string) => string;
-    };
-    expect(exports.fixedAudioPhrases).toHaveLength(150);
-    expect(exports.fixedAudioPhrases).toEqual([
-      ...allMissions.flatMap((mission) => mission.productionPhrases),
-      ...emergencyPhrases
-    ].map(({ id, english, audio }) => ({ id, english, audio })));
-    expect(() => exports.contentIdToAudioSlug?.("../unsafe")).toThrow(/unsafe/i);
-    expect(() => exports.contentIdToAudioSlug?.("UPPERCASE")).toThrow(/unsafe/i);
-  });
-
-  it("makes the generator reject manifest collisions before writing", () => {
-    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/generate-fixed-audio.mjs")).href;
-    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
-      import { validateManifest } from ${JSON.stringify(moduleUrl)};
-      const manifest = Array.from({ length: 150 }, (_, index) => {
-        const id = index === 149 ? "phrase-0" : \`phrase-\${index}\`;
-        return { id, english: "Test phrase", audio: \`/audio/phrases/\${id}.aiff\` };
-      });
-      validateManifest(manifest);
-    `], { encoding: "utf8" });
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/collision/i);
-  });
-
-  it("makes the generator reject FORM shells without required AIFF chunks", () => {
-    const moduleUrl = pathToFileURL(join(projectRoot, "scripts/generate-fixed-audio.mjs")).href;
-    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
-      import { validateAiffBytes } from ${JSON.stringify(moduleUrl)};
-      const bytes = Buffer.alloc(20);
-      bytes.write("FORM", 0, "ascii");
-      bytes.write("AIFF", 8, "ascii");
-      bytes.write("JUNK", 12, "ascii");
-      try { validateAiffBytes(bytes, "fake.aiff"); }
-      catch (error) { if (String(error).includes("COMM")) process.exit(0); throw error; }
-      throw new Error("invalid AIFF was accepted");
-    `], { encoding: "utf8" });
-    expect(result.status, result.stderr).toBe(0);
-  });
-
-  it("uses 150 unique safe IDs and paths backed by nonempty AIFF files", () => {
+describe("open-source media boundary", () => {
+  it("contains no generated system-voice files or generator", () => {
     const phrases = [
       ...allMissions.flatMap((mission) => mission.productionPhrases),
       ...emergencyPhrases
     ];
     expect(phrases).toHaveLength(150);
     expect(new Set(phrases.map((phrase) => phrase.id)).size).toBe(150);
-    const paths = phrases.map((phrase) => phrase.audio);
-    expect(new Set(paths).size).toBe(150);
-    for (const audioPath of paths) {
-      expect(audioPath).toMatch(/^\/audio\/(?:phrases|emergency)\/[a-z0-9]+(?:-[a-z0-9]+)*\.aiff$/);
-      const absolutePath = join(projectRoot, "public", audioPath!.slice(1));
-      expect(statSync(absolutePath).size, audioPath).toBeGreaterThan(12);
-      const bytes = readFileSync(absolutePath);
-      expect(bytes.subarray(0, 4).toString("ascii"), audioPath).toBe("FORM");
-      expect(bytes.subarray(8, 12).toString("ascii"), audioPath).toBe("AIFF");
-      expect(aiffChunkIds(bytes), audioPath).toEqual(expect.arrayContaining(["COMM", "SSND"]));
-    }
-  });
-
-  it("has no orphan AIFF files", () => {
-    const referenced = [...allMissions.flatMap((mission) => mission.productionPhrases), ...emergencyPhrases]
-      .flatMap((phrase) => typeof phrase.audio === "string"
-        ? [join(projectRoot, "public", phrase.audio.slice(1))]
-        : [])
-      .sort();
-    expect(listAiffFiles(join(projectRoot, "public/audio")).sort()).toEqual(referenced);
+    expect(phrases.every((phrase) => !("audio" in phrase))).toBe(true);
+    expect(listAiffFiles(join(projectRoot, "public"))).toEqual([]);
+    expect(existsSync(join(projectRoot, "scripts/generate-fixed-audio.mjs"))).toBe(false);
   });
 });

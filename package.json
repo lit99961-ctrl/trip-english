@@ -16,7 +16,6 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "content:dictionary": "node scripts/build-dictionary.mjs",
-    "content:audio": "node scripts/generate-fixed-audio.mjs",
     "check": "npm run test && npm run build"
   },
   "dependencies": {

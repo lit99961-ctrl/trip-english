@@ -22,7 +22,7 @@ registerSW({
     if (registration?.active && "caches" in window) {
       void countReadyOfflineGroups(caches, import.meta.env.BASE_URL).then((count) => {
         offlineStatus.setReadyGroups(count);
-        if (count === 3) offlineStatus.markReady();
+        if (count === 2) offlineStatus.markReady();
       }).catch(() => offlineStatus.setReadyGroups(0));
     }
   },

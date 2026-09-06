@@ -4,7 +4,6 @@ import {
   countReadyOfflineGroups,
   deriveOfflineState,
   mountOfflineStatus,
-  resolveAppAssetPath
 } from "../../src/app/offline-status";
 import type { SpeechPort } from "../../src/speech/speech-port";
 
@@ -23,7 +22,7 @@ describe("offline readiness", () => {
     expect(deriveOfflineState({ online: true, fixedAssetsReady: false, readyGroups: 2 })).toEqual({
       lessonsAvailable: true,
       recognitionAvailable: true,
-      label: "正在准备离线内容 2/3"
+      label: "离线内容已就绪"
     });
     expect(deriveOfflineState({ online: false, fixedAssetsReady: false })).toEqual({
       lessonsAvailable: false,
@@ -46,7 +45,7 @@ describe("offline readiness", () => {
       initiallyReady: false
     });
     mounted.setReadyGroups(2);
-    expect(status.textContent).toBe("正在准备离线内容 2/3");
+    expect(status.textContent).toBe("离线内容已就绪");
     mounted.markReady();
     expect(status.textContent).toBe("离线内容已就绪");
     online = false;
@@ -58,7 +57,6 @@ describe("offline readiness", () => {
 
   it("falls back to self rating offline while retaining local speech features", async () => {
     const speech: SpeechPort = {
-      playFixed: vi.fn(async () => undefined),
       speak: vi.fn(async () => undefined),
       startRecording: vi.fn(async () => ({ stop: async () => new Blob() })),
       recognize: vi.fn(async () => ({ transcript: "hello", confidence: 1 })),
@@ -68,29 +66,23 @@ describe("offline readiness", () => {
 
     expect(await offline.recognitionMode()).toBe("self-rating");
     await expect(offline.recognize("en-US")).resolves.toBeNull();
-    await offline.playFixed("/audio/example.aiff", 1);
-    expect(speech.playFixed).toHaveBeenCalled();
+    await offline.speak("Hello", 1);
+    expect(speech.speak).toHaveBeenCalledWith("Hello", 1);
     expect(speech.recognize).not.toHaveBeenCalled();
   });
 
-  it("only verifies readiness when shell, bundle, and all fixed audio are cached", async () => {
+  it("verifies readiness from the shell and application bundle without audio assets", async () => {
     const urls = [
       "https://example.test/app/index.html",
       "https://example.test/app/assets/index.css",
-      "https://example.test/app/assets/index.js",
-      ...Array.from({ length: 150 }, (_, index) => `https://example.test/app/audio/phrases/${index}.aiff`)
+      "https://example.test/app/assets/index.js"
     ];
     const storage = {
       keys: async () => ["precache"],
       open: async () => ({ keys: async () => urls.map((url) => new Request(url)) })
     };
-    await expect(countReadyOfflineGroups(storage, "/app/")).resolves.toBe(3);
-    urls.pop();
     await expect(countReadyOfflineGroups(storage, "/app/")).resolves.toBe(2);
-  });
-
-  it("resolves bundled audio inside a deployment subpath", () => {
-    expect(resolveAppAssetPath("/audio/phrases/hotel.aiff", "/opc/")).toBe("/opc/audio/phrases/hotel.aiff");
-    expect(resolveAppAssetPath("/audio/phrases/hotel.aiff", "/")).toBe("/audio/phrases/hotel.aiff");
+    urls.pop();
+    await expect(countReadyOfflineGroups(storage, "/app/")).resolves.toBe(1);
   });
 });

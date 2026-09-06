@@ -8,7 +8,6 @@ class Events {
   emit(type: string, event: any = {}) { this.listeners.get(type)?.forEach((listener) => listener(event)); }
   listenerCount(type: string) { return this.listeners.get(type)?.size ?? 0; }
 }
-class FakeAudio extends Events { playbackRate = 1; async play() {} }
 class FakeUtterance extends Events { lang = ""; rate = 1; constructor(readonly text: string) { super(); } }
 class FakeSynthesis { utterance: FakeUtterance | null = null; utterances: FakeUtterance[] = []; cancelled = false; cancel() { this.cancelled = true; } speak(utterance: FakeUtterance) { this.utterance = utterance; this.utterances.push(utterance); } }
 class FakeTrack { stopped = false; stop() { this.stopped = true; } }
@@ -28,28 +27,6 @@ describe("BrowserSpeech", () => {
 
   it("uses automatic recognition when a constructor is available", async () => {
     await expect(new BrowserSpeech({ SpeechRecognition: FakeRecognition }).recognitionMode()).resolves.toBe("automatic");
-  });
-
-  it("plays fixed audio at its exact rate until ended and rejects media errors", async () => {
-    const audio = new FakeAudio();
-    const speech = new BrowserSpeech({ createAudio: () => audio });
-    const playing = speech.playFixed("/delayed.mp3", 0.75);
-    expect(audio.playbackRate).toBe(0.75);
-    audio.emit("ended");
-    await expect(playing).resolves.toBeUndefined();
-    const failed = speech.playFixed("/delayed.mp3", 1);
-    audio.emit("error");
-    await expect(failed).rejects.toMatchObject({ code: "playback-failed" });
-  });
-
-  it("converts rejected audio playback into a typed failure and removes listeners", async () => {
-    const audio = new FakeAudio();
-    audio.play = () => Promise.reject(new Error("blocked"));
-    const result = new BrowserSpeech({ createAudio: () => audio }).playFixed("/blocked.mp3", 1);
-
-    await expect(result).rejects.toMatchObject({ code: "playback-failed" });
-    expect(audio.listenerCount("ended")).toBe(0);
-    expect(audio.listenerCount("error")).toBe(0);
   });
 
   it("speaks English at its exact rate and reports synthesis failure", async () => {

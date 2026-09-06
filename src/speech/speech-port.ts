@@ -8,7 +8,6 @@ export interface RecognitionResult {
 }
 
 export interface SpeechPort {
-  playFixed(src: string, rate: 1 | 0.75): Promise<void>;
   speak(text: string, rate: 1 | 0.75): Promise<void>;
   startRecording(): Promise<RecordingSession>;
   recognize(expectedLanguage: "en-US"): Promise<RecognitionResult | null>;

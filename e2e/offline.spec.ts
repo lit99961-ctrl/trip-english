@@ -23,8 +23,7 @@ test("serves every required offline asset under the configured base path", async
   for (const path of [
     "manifest.webmanifest",
     "sw.js",
-    "icons/icon-192.png",
-    "audio/phrases/hotel-checkin-reservation.aiff"
+    "icons/icon-192.png"
   ]) {
     const response = await request.get(`${basePath}${path}`);
     expect(response.status(), path).toBe(200);
