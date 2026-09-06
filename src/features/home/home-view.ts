@@ -109,7 +109,7 @@ export async function renderHome(options: HomeViewOptions): Promise<HTMLElement>
   heading.textContent = mission.titleZh;
   const route = document.createElement("ol");
   route.className = "route-map";
-  route.setAttribute("aria-label", "12 天训练路线");
+  route.setAttribute("aria-label", `${courseSessions.length} 天训练路线`);
   courseSessions.forEach((session, index) => {
     const node = document.createElement("li");
     node.dataset.routeNode = "";

@@ -32,7 +32,7 @@ describe("course catalog", () => {
   it("keeps authored phrases text-only so third-party voices are never redistributed", () => {
     const phrases = allMissions.flatMap((mission) => mission.productionPhrases);
 
-    expect(phrases).toHaveLength(100);
+    expect(phrases).toHaveLength(106);
     expect(emergencyPhrases).toHaveLength(50);
     expect([...phrases, ...emergencyPhrases].every((phrase) =>
       !("audio" in phrase)
@@ -56,7 +56,7 @@ describe("course catalog", () => {
 
   it("accepts the full catalog and an explicit valid catalog", () => {
     expect(validateCatalog()).toEqual(allMissions);
-    expect(catalog).toHaveLength(12);
+    expect(catalog).toHaveLength(13);
     expect(validateCatalog([candidateMission()])).toHaveLength(1);
   });
 

@@ -42,6 +42,7 @@ function displayedEnglishWords(): string[] {
   for (const mission of allMissions) {
     displayedText.push(mission.city, ...mission.recognitionWords);
     displayedText.push(...mission.productionPhrases.map((phrase) => phrase.english));
+    displayedText.push(...(mission.listeningScenarios?.map((scenario) => scenario.transcript) ?? []));
     for (const exercise of mission.exercises) {
       if (exercise.type === "reading") {
         displayedText.push(exercise.readingText);
@@ -256,8 +257,8 @@ describe("open-source media boundary", () => {
       ...allMissions.flatMap((mission) => mission.productionPhrases),
       ...emergencyPhrases
     ];
-    expect(phrases).toHaveLength(150);
-    expect(new Set(phrases.map((phrase) => phrase.id)).size).toBe(150);
+    expect(phrases).toHaveLength(156);
+    expect(new Set(phrases.map((phrase) => phrase.id)).size).toBe(156);
     expect(phrases.every((phrase) => !("audio" in phrase))).toBe(true);
     expect(listAiffFiles(join(projectRoot, "public"))).toEqual([]);
     expect(existsSync(join(projectRoot, "scripts/generate-fixed-audio.mjs"))).toBe(false);

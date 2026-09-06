@@ -414,4 +414,37 @@ describe("speaking-first lesson", () => {
     expect(view.querySelector('[role="alert"]')?.textContent).toContain("播放失败");
     expect(view.querySelectorAll("button.primary-action")).toHaveLength(1);
   });
+
+  it("trains a real staff response with normal, slow, silent and three-choice modes", async () => {
+    const { speech, persistence } = fixture();
+    const progress = createLearnerProgressV1();
+    progress.sessions[hotel.id] = {
+      missionId: hotel.id,
+      completedExerciseIds: [hotel.exercises[0]!.id]
+    };
+    const view = renderLesson({ mission: hotel, progress, speech, persistence });
+    document.body.append(view);
+    const scenario = hotel.listeningScenarios![0]!;
+
+    expect(view.querySelectorAll('input[type="radio"]')).toHaveLength(3);
+    expect(view.textContent).toContain(scenario.meaningZh);
+    expect(view.textContent).toContain(scenario.distractorsZh[0]);
+    expect(view.textContent).not.toContain(scenario.transcript);
+
+    const buttons = [...view.querySelectorAll<HTMLButtonElement>("button")];
+    buttons.find((button) => button.textContent === "正常播放")!.click();
+    buttons.find((button) => button.textContent === "慢速播放")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(speech.speak).toHaveBeenNthCalledWith(1, scenario.transcript, 1);
+    expect(speech.speak).toHaveBeenNthCalledWith(2, scenario.transcript, 0.75);
+
+    buttons.find((button) => button.textContent === "显示文字")!.click();
+    expect(view.textContent).toContain(scenario.transcript);
+    view.querySelector<HTMLInputElement>('input[value="answer"]')!.click();
+    await click(view);
+
+    expect(persistence.saveExerciseResult).toHaveBeenCalledWith(expect.objectContaining({
+      attemptEvent: expect.objectContaining({ scenarioId: scenario.id })
+    }));
+  });
 });

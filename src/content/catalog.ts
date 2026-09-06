@@ -33,8 +33,17 @@ export function validateCatalog(candidate: unknown = missionSource): DeepReadonl
     missions.flatMap((mission) => mission.exercises.map((exercise) => exercise.id)),
     "exercise"
   );
+  assertUnique(
+    missions.flatMap((mission) => mission.listeningScenarios?.map((scenario) => scenario.id) ?? []),
+    "listening scenario"
+  );
 
   for (const mission of missions) {
+    for (const scenario of mission.listeningScenarios ?? []) {
+      if (!scenario.id.startsWith(`${mission.id}-`)) {
+        throw new Error(`listening scenario ${scenario.id} must be namespaced by ${mission.id}`);
+      }
+    }
     const phrasesById = new Map(mission.productionPhrases.map((phrase) => [phrase.id, phrase]));
 
     for (const exercise of mission.exercises) {
@@ -69,7 +78,7 @@ export interface CourseAssembly {
   readonly courseSessions: readonly CourseSession[];
 }
 
-const expectedTravelIds = ["hk-checkin", "helsinki-transfer", "rome-arrival", "hotel-checkin", "directions-tickets", "restaurant", "italy-high-speed-rail", "venice-vaporetto", "milan-swiss-transfer", "swiss-mountain-transit", "shopping-tax-refund", "urgent-help"];
+const expectedTravelIds = ["hk-checkin", "helsinki-transfer", "rome-arrival", "hotel-checkin", "directions-tickets", "restaurant", "italy-high-speed-rail", "venice-vaporetto", "milan-swiss-transfer", "swiss-mountain-transit", "shopping-tax-refund", "urgent-help", "supermarket-groceries"];
 const expectedBusinessSessions = new Map([["email-action", 4], ["internet-headline", 8], ["message-intent", 11]]);
 
 export function assembleCourse(candidate: unknown) {
@@ -81,7 +90,7 @@ export function assembleCourse(candidate: unknown) {
   const businessBySession = new Map<number, (typeof business)[number]>(business.map((mission) => [mission.embeddedSession, mission]));
   const sessions = travel.map((travelMission, index) => ({ sessionNumber: index + 1, travelMission, businessMission: businessBySession.get(index + 1) }));
   const activeTargets = sessions.flatMap((session) => [session.travelMission, session.businessMission].filter(Boolean).flatMap((mission) => mission!.productionPhrases)).filter((phrase) => phrase.activeTarget);
-  if (activeTargets.length !== 30) throw new Error("course requires exactly 30 active targets");
+  if (activeTargets.length !== 33) throw new Error("course requires exactly 33 active targets");
   return deepFreeze({ allMissions: missions, courseSessions: sessions });
 }
 
@@ -89,7 +98,7 @@ const assembledCourse = assembleCourse(missionSource);
 export const allMissions = assembledCourse.allMissions;
 export const courseSessions = assembledCourse.courseSessions;
 
-/** Consumer-facing twelve-session course. */
+/** Consumer-facing thirteen-session course. */
 export const catalog = courseSessions;
 
 export { renderRoleplayPrompt };

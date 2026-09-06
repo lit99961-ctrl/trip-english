@@ -15,6 +15,7 @@ export function collectDisplayedEnglish(
   for (const mission of missions) {
     texts.push(mission.city, ...mission.recognitionWords);
     texts.push(...mission.productionPhrases.map((phrase) => phrase.english));
+    texts.push(...(mission.listeningScenarios?.map((scenario) => scenario.transcript) ?? []));
     for (const exercise of mission.exercises) {
       if (exercise.type === "reading") {
         texts.push(exercise.readingText);

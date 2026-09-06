@@ -238,7 +238,8 @@ export function renderLesson(options: LessonViewOptions): LessonView {
   const persistCompletion = async (
     exerciseId: string,
     candidateState: LessonState,
-    candidateClass?: AttemptClass
+    candidateClass?: AttemptClass,
+    scenarioId?: string
   ): Promise<boolean> => {
     if (!pendingCompletion) {
       const speakingSecondsDelta = exerciseSpeakingSeconds;
@@ -266,7 +267,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
               attemptId: newAttempt.attempt.attemptId,
               phraseId: newAttempt.phraseId,
               missionId: mission.id,
-              ...(exercise?.type === "roleplay" ? { scenarioId: exercise.id } : {}),
+              ...(scenarioId ? { scenarioId } : exercise?.type === "roleplay" ? { scenarioId: exercise.id } : {}),
               hintUsed: (newAttempt.attempt.hintCount ?? 0) > 0,
               occurredAt: newAttempt.attempt.timestamp
             }
@@ -424,15 +425,46 @@ export function renderLesson(options: LessonViewOptions): LessonView {
         });
       }
     } else if (stage === "comprehension") {
-      if (phrase) {
-        const listen = document.createElement("button");
-        listen.type = "button";
-        listen.className = "secondary-action";
-        listen.textContent = "播放英文";
-        listen.addEventListener("click", () => playWithFeedback(() => speech.speak(phrase.english, 1)));
-        root.append(listen);
+      const choiceAttempts = Object.values(state.phraseAttempts)
+        .flat()
+        .filter((attempt) => attempt.activity === "choice").length;
+      const scenarios = mission.listeningScenarios ?? [];
+      const scenario = scenarios.length > 0 ? scenarios[choiceAttempts % scenarios.length] : undefined;
+      const listeningText = scenario?.transcript ?? phrase?.english;
+      if (listeningText) {
+        const normal = document.createElement("button");
+        normal.type = "button";
+        normal.className = "secondary-action";
+        normal.textContent = scenario ? "正常播放" : "播放英文";
+        normal.addEventListener("click", () => playWithFeedback(() => speech.speak(listeningText, 1)));
+        root.append(normal);
+
+        if (scenario) {
+          const slow = document.createElement("button");
+          slow.type = "button";
+          slow.className = "secondary-action";
+          slow.textContent = "慢速播放";
+          slow.addEventListener("click", () => playWithFeedback(() => speech.speak(listeningText, 0.75)));
+          const reveal = document.createElement("button");
+          reveal.type = "button";
+          reveal.className = "secondary-action";
+          reveal.textContent = "显示文字";
+          reveal.addEventListener("click", () => {
+            if (root.querySelector("[data-listening-transcript]")) return;
+            const transcript = document.createElement("p");
+            transcript.dataset.listeningTranscript = "true";
+            transcript.lang = "en";
+            transcript.textContent = listeningText;
+            reveal.insertAdjacentElement("afterend", transcript);
+          });
+          root.append(slow, reveal);
+        }
       }
-      const choices = choiceField([
+      const choices = choiceField(scenario ? [
+        { value: "answer", label: scenario.meaningZh },
+        { value: "distractor-1", label: scenario.distractorsZh[0]! },
+        { value: "distractor-2", label: scenario.distractorsZh[1]! }
+      ] : [
         { value: "answer", label: phrase?.intent ?? "这句话的用途" },
         { value: "other", label: "其他意思" }
       ], `comprehension-${exercise.id}`);
@@ -464,7 +496,7 @@ export function renderLesson(options: LessonViewOptions): LessonView {
           });
           candidateClass = candidateState.phraseClasses[phrase.id];
         }
-        await persistCompletion(exercise.id, candidateState, candidateClass);
+        await persistCompletion(exercise.id, candidateState, candidateClass, scenario?.id);
         render();
       });
     } else if (stage === "reading-close" && exercise.type === "reading") {

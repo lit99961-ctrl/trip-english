@@ -12,6 +12,9 @@ import type { ProgressRepository } from "../../storage/progress-repository";
 import { requestPersistentStorage } from "../../storage/persistence";
 
 const FINAL_RECORDING_KEY = "final/comparison";
+const ACTIVE_TARGET_COUNT = allMissions
+  .flatMap((mission) => mission.productionPhrases)
+  .filter((phrase) => phrase.activeTarget).length;
 
 export interface ProgressView extends HTMLElement {
   dispose(): Promise<void>;
@@ -119,7 +122,7 @@ export async function renderProgress(options: ProgressViewOptions): Promise<Prog
   };
   metrics.append(
     metric("开口时间", `${Math.floor(progress.speakingSeconds / 60)} / 120 分钟`),
-    metric("主动回忆", `${recallCount(progress)} / 30`),
+    metric("主动回忆", `${recallCount(progress)} / ${ACTIVE_TARGET_COUNT}`),
     metric("独立完成", `无提示场景 ${new Set(progress.promptFreeScenarioIds).size}`),
     metric("提示趋势", hintTrend(progress))
   );

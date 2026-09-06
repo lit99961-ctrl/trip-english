@@ -53,7 +53,7 @@ describe("measured progress", () => {
     });
 
     expect(view.textContent).toContain("61 / 120 分钟");
-    expect(view.textContent).toContain("2 / 30");
+    expect(view.textContent).toContain("2 / 33");
     expect(view.textContent).toContain("无提示场景 2");
     expect(view.textContent).toContain("已授权持久存储");
     expect(view.textContent).toContain("提示趋势");

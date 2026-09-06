@@ -4,6 +4,19 @@ const placeholderIdentifierPattern = /^[A-Za-z][A-Za-z0-9_]*$/;
 const placeholderPattern = /\{([A-Za-z][A-Za-z0-9_]*)\}/g;
 const trimmedNonemptyString = z.string().min(1).refine((value) => value === value.trim(), "value must be trimmed and nonempty");
 
+export const listeningScenarioSchema = z.object({
+  id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  transcript: trimmedNonemptyString,
+  meaningZh: trimmedNonemptyString,
+  distractorsZh: z.tuple([trimmedNonemptyString, trimmedNonemptyString]),
+  keywords: z.array(trimmedNonemptyString).min(1).max(4)
+}).strict().superRefine((scenario, context) => {
+  const meanings = [scenario.meaningZh, ...scenario.distractorsZh];
+  if (new Set(meanings).size !== meanings.length) {
+    context.addIssue({ code: "custom", message: "listening meanings must be distinct" });
+  }
+});
+
 export const phraseSchema = z.object({
   id: z.string().min(1),
   english: z.string().min(1),
@@ -43,7 +56,8 @@ const missionFields = {
   titleZh: z.string().min(1),
   city: z.string().min(1),
   productionPhrases: z.array(phraseSchema).min(5).max(8),
-  recognitionWords: z.array(z.string()).min(1)
+  recognitionWords: z.array(z.string()).min(1),
+  listeningScenarios: z.array(listeningScenarioSchema).min(3).optional()
 };
 
 export const missionSchema = z
@@ -62,4 +76,5 @@ export const missionSchema = z
   );
 
 export type Phrase = z.infer<typeof phraseSchema>;
+export type ListeningScenario = z.infer<typeof listeningScenarioSchema>;
 export type Mission = z.infer<typeof missionSchema>;

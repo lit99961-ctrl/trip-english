@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { missionSchema, type Mission } from "../domain/content-schema";
 import { deepFreeze, type DeepReadonly } from "./content-validation";
+import { listeningScenariosByMission } from "./listening-scenarios";
 
 type PhraseDraft = readonly [string, string, string, string, readonly string[], readonly (readonly string[])[], boolean?];
 
@@ -16,12 +17,20 @@ function travelMission(
   activeSuffixes: readonly string[],
   phrases: readonly PhraseDraft[]
 ): Mission {
+  const listeningScenarios = listeningScenariosByMission[id as keyof typeof listeningScenariosByMission];
   return {
     id,
     kind: "travel",
     titleZh,
     city,
     recognitionWords: [...recognitionWords],
+    ...(listeningScenarios === undefined ? {} : {
+      listeningScenarios: listeningScenarios.map((scenario) => ({
+        ...scenario,
+        distractorsZh: [...scenario.distractorsZh] as [string, string],
+        keywords: [...scenario.keywords]
+      }))
+    }),
     productionPhrases: phrases.map(([suffix, english, chinese, intent, keywords, requiredKeywordGroups, recovery]) => ({
       id: `${id}-${suffix}`,
       english,
@@ -147,6 +156,14 @@ const travelMissionSource: readonly Mission[] = [
     ["toilet", "Where is the nearest toilet?", "最近的洗手间在哪里？", "find-toilet", ["nearest", "toilet"], [["toilet", "WC"]]],
     ["location", "Could you show me this location on the map?", "您能在地图上给我看这个位置吗？", "recover-location", ["show", "location", "map"], [["location"], ["map"]], true],
     ["emergency", "Please call 112. I need help.", "请拨打112。我需要帮助。", "request-emergency-call", ["112", "help"], [["112"], ["call"]]]
+  ]),
+  travelMission("supermarket-groceries", "超市购物", "Italy and Switzerland", ["price", "kilo", "bag", "card", "receipt", "self-checkout", "weigh"], { payment: "card" }, "Can I pay by {payment}?", "SELF-CHECKOUT: WEIGH PRODUCE BEFORE PAYMENT — RECEIPT BELOW", "card", ["price", "kilo", "card"], [
+    ["price", "How much does this cost?", "这个多少钱？", "ask-price", ["price", "cost"], [["how much", "price"], ["this"]]],
+    ["kilo", "I would like one kilo, please.", "我想要一公斤。", "buy-by-weight", ["one", "kilo"], [["one", "1"], ["kilo"]]],
+    ["bag", "I need a bag, please.", "我需要一个袋子。", "request-bag", ["need", "bag"], [["need"], ["bag"]]],
+    ["card", "Can I pay by card?", "我可以刷卡吗？", "pay-by-card", ["pay", "card"], [["pay"], ["card"]]],
+    ["receipt", "Could I have the receipt?", "可以给我收据吗？", "request-receipt", ["have", "receipt"], [["have", "need"], ["receipt"]]],
+    ["weigh", "Could you show me where to weigh this?", "可以告诉我在哪里称重吗？", "recover-weigh", ["show", "weigh"], [["show"], ["weigh"]], true]
   ])
 ];
 

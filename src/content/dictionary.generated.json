@@ -293,6 +293,18 @@
     ]
   },
   {
+    "word": "be",
+    "phonetic": "bi:",
+    "chinese": "v. 是, 表示, 在",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "before",
     "phonetic": "bi'fɒ:",
     "chinese": "prep. 在...之前",
@@ -301,6 +313,19 @@
       "ecdict",
       "gk",
       "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "below",
+    "phonetic": "bi'lәu",
+    "chinese": "prep. 在下面",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
+      "toefl",
       "zk"
     ]
   },
@@ -410,6 +435,18 @@
       "ecdict",
       "gk",
       "ielts",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "but",
+    "phonetic": "bʌt",
+    "chinese": "prep. 除了",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
       "oxford",
       "zk"
     ]
@@ -619,6 +656,16 @@
     ]
   },
   {
+    "word": "checkout",
+    "phonetic": "'tʃekaut",
+    "chinese": "n. 结帐台",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "toefl"
+    ]
+  },
+  {
     "word": "claim",
     "phonetic": "kleim",
     "chinese": "n. 要求, 要求权, 断言, 权利",
@@ -720,6 +767,19 @@
       "gre",
       "ielts",
       "ky",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "cost",
+    "phonetic": "kɒst",
+    "chinese": "n. 代价, 价值, 费用",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "ielts",
       "oxford",
       "zk"
     ]
@@ -835,6 +895,18 @@
     ]
   },
   {
+    "word": "dish",
+    "phonetic": "diʃ",
+    "chinese": "n. 盘子, 碟, 菜肴",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "do",
     "phonetic": "du:",
     "chinese": "v. 做, 进行, 完成",
@@ -914,6 +986,17 @@
     ]
   },
   {
+    "word": "eight",
+    "phonetic": "eit",
+    "chinese": "num. 八, 八个",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "zk"
+    ]
+  },
+  {
     "word": "email",
     "phonetic": "'i:'meil",
     "chinese": "n. 电子信函",
@@ -985,6 +1068,15 @@
       "ky",
       "oxford",
       "toefl"
+    ]
+  },
+  {
+    "word": "euros",
+    "phonetic": "'ju:rәus",
+    "chinese": "n. 欧元",
+    "tags": [
+      "catalog",
+      "ecdict"
     ]
   },
   {
@@ -1558,6 +1650,18 @@
     ]
   },
   {
+    "word": "kilo",
+    "phonetic": "'kilәu",
+    "chinese": "n. 千",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "ky",
+      "zk"
+    ]
+  },
+  {
     "word": "kiosk",
     "phonetic": "ki'ɒsk",
     "chinese": "n. 亭, 凉亭, 报摊",
@@ -1630,6 +1734,15 @@
       "ielts",
       "oxford",
       "zk"
+    ]
+  },
+  {
+    "word": "leaves",
+    "phonetic": "li:vz",
+    "chinese": "pl. 树叶, 花瓣",
+    "tags": [
+      "catalog",
+      "ecdict"
     ]
   },
   {
@@ -2067,6 +2180,17 @@
     ]
   },
   {
+    "word": "nine",
+    "phonetic": "nain",
+    "chinese": "num. 九, 九个",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "zk"
+    ]
+  },
+  {
     "word": "no",
     "phonetic": "nәu",
     "chinese": "n. 不, 拒绝, 否决票",
@@ -2372,6 +2496,18 @@
     ]
   },
   {
+    "word": "per",
+    "phonetic": "pә:",
+    "chinese": "prep. 每一, 通过, 经, 按照",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "ielts",
+      "oxford"
+    ]
+  },
+  {
     "word": "pharmacy",
     "phonetic": "'fɑ:mәsi",
     "chinese": "n. 药房, 配药学, 制药业",
@@ -2495,6 +2631,19 @@
     ]
   },
   {
+    "word": "price",
+    "phonetic": "prais",
+    "chinese": "n. 价格, 代价, 价值",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "ielts",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "problem",
     "phonetic": "'prɒblәm",
     "chinese": "n. 问题, 难题",
@@ -2503,6 +2652,23 @@
       "ecdict",
       "gk",
       "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "produce",
+    "phonetic": "prә'dju:s",
+    "chinese": "n. 生产品, 物产, 后代",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "gre",
+      "ky",
+      "oxford",
+      "toefl",
       "zk"
     ]
   },
@@ -2795,6 +2961,15 @@
     ]
   },
   {
+    "word": "self-checkout",
+    "phonetic": "self ˈtʃekaut",
+    "chinese": "（让顾客在无收银员的情况下）自行付费结帐的零售系统",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "send",
     "phonetic": "send",
     "chinese": "vt. 发送, 使进入, 寄, 派遣, 发射, 使陷于",
@@ -2835,6 +3010,17 @@
       "gk",
       "ielts",
       "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "seven",
+    "phonetic": "'sevn",
+    "chinese": "num. 七, 七个",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
       "zk"
     ]
   },
@@ -2960,6 +3146,15 @@
     ]
   },
   {
+    "word": "sold",
+    "phonetic": "sәuld",
+    "chinese": "sell的过去式和过去分词",
+    "tags": [
+      "catalog",
+      "ecdict"
+    ]
+  },
+  {
     "word": "someone",
     "phonetic": "'sʌmwʌn",
     "chinese": "pron. 有人, 某人",
@@ -2967,6 +3162,18 @@
       "catalog",
       "ecdict",
       "gk",
+      "zk"
+    ]
+  },
+  {
+    "word": "sorry",
+    "phonetic": "'sɒri",
+    "chinese": "a. 难过的, 悲哀的, 遗憾的",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
       "zk"
     ]
   },
@@ -3166,6 +3373,17 @@
     ]
   },
   {
+    "word": "ten",
+    "phonetic": "ten",
+    "chinese": "num. 十, 十个",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "zk"
+    ]
+  },
+  {
     "word": "termini",
     "phonetic": "/ˈtɛr.mi.ni/",
     "chinese": "罗马特米尼火车站",
@@ -3226,6 +3444,17 @@
     ]
   },
   {
+    "word": "thirty",
+    "phonetic": "'θә:ti",
+    "chinese": "num. 三十, 三十个",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "zk"
+    ]
+  },
+  {
     "word": "this",
     "phonetic": "θis",
     "chinese": "pron. 这, 本",
@@ -3234,6 +3463,17 @@
       "ecdict",
       "gk",
       "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "three",
+    "phonetic": "θri:",
+    "chinese": "num. 三, 三个",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
       "zk"
     ]
   },
@@ -3397,6 +3637,19 @@
     ]
   },
   {
+    "word": "travel",
+    "phonetic": "'trævl",
+    "chinese": "n. 旅行, 游历, 行进",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "ielts",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "traveling",
     "phonetic": "'trævliŋ",
     "chinese": "a. 旅行的, 旅行用的, 移动的",
@@ -3404,6 +3657,29 @@
       "catalog",
       "ecdict",
       "ielts"
+    ]
+  },
+  {
+    "word": "try",
+    "phonetic": "trai",
+    "chinese": "n. 尝试, 试验, 审理, 审判",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
+    "word": "twenty",
+    "phonetic": "'twenti",
+    "chinese": "num. 二十, 二十个",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "zk"
     ]
   },
   {
@@ -3553,6 +3829,18 @@
     ]
   },
   {
+    "word": "wait",
+    "phonetic": "weit",
+    "chinese": "n. 等待, 等候",
+    "tags": [
+      "catalog",
+      "ecdict",
+      "gk",
+      "oxford",
+      "zk"
+    ]
+  },
+  {
     "word": "walk",
     "phonetic": "wɒ:k",
     "chinese": "n. 走, 散步, 步行, 行走的路程, 竞走, 散步场所",
@@ -3632,6 +3920,21 @@
       "ielts",
       "oxford",
       "toefl",
+      "zk"
+    ]
+  },
+  {
+    "word": "weigh",
+    "phonetic": "wei",
+    "chinese": "vt. 称...重量, 衡量, 把...压弯, 考虑, 权衡, 起锚",
+    "tags": [
+      "catalog",
+      "cet4",
+      "cet6",
+      "ecdict",
+      "gk",
+      "ky",
+      "oxford",
       "zk"
     ]
   },
@@ -3869,17 +4172,6 @@
     ]
   },
   {
-    "word": "be",
-    "phonetic": "bi:",
-    "chinese": "v. 是, 表示, 在",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
     "word": "he",
     "phonetic": "hi:",
     "chinese": "pron. 他",
@@ -3905,17 +4197,6 @@
     "word": "she",
     "phonetic": "ʃi:",
     "chinese": "pron. 她",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "but",
-    "phonetic": "bʌt",
-    "chinese": "prep. 除了",
     "tags": [
       "ecdict",
       "gk",
@@ -4755,17 +5036,6 @@
     "word": "under",
     "phonetic": "'ʌndә",
     "chinese": "prep. 在...之下, 低于",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "try",
-    "phonetic": "trai",
-    "chinese": "n. 尝试, 试验, 审理, 审判",
     "tags": [
       "ecdict",
       "gk",
@@ -6053,22 +6323,6 @@
     ]
   },
   {
-    "word": "produce",
-    "phonetic": "prә'dju:s",
-    "chinese": "n. 生产品, 物产, 后代",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ky",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
     "word": "rate",
     "phonetic": "reit",
     "chinese": "n. 比率, 率, 速度, 价格, 费用, 等级",
@@ -6567,18 +6821,6 @@
     ]
   },
   {
-    "word": "price",
-    "phonetic": "prais",
-    "chinese": "n. 价格, 代价, 价值",
-    "tags": [
-      "ecdict",
-      "gk",
-      "ielts",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
     "word": "action",
     "phonetic": "'ækʃәn",
     "chinese": "n. 行动, 活动, 动作, 作用, 战斗, 行为, 诉讼",
@@ -6607,18 +6849,6 @@
       "ky",
       "oxford",
       "toefl"
-    ]
-  },
-  {
-    "word": "cost",
-    "phonetic": "kɒst",
-    "chinese": "n. 代价, 价值, 费用",
-    "tags": [
-      "ecdict",
-      "gk",
-      "ielts",
-      "oxford",
-      "zk"
     ]
   },
   {
@@ -7883,17 +8113,6 @@
     "word": "boy",
     "phonetic": "bɒi",
     "chinese": "n. 男孩",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "wait",
-    "phonetic": "weit",
-    "chinese": "n. 等待, 等候",
     "tags": [
       "ecdict",
       "gk",
@@ -10987,17 +11206,6 @@
     ]
   },
   {
-    "word": "per",
-    "phonetic": "pә:",
-    "chinese": "prep. 每一, 通过, 经, 按照",
-    "tags": [
-      "ecdict",
-      "gk",
-      "ielts",
-      "oxford"
-    ]
-  },
-  {
     "word": "income",
     "phonetic": "'inkʌm",
     "chinese": "n. 收入, 收益, 流入",
@@ -12380,228 +12588,6 @@
       "ielts",
       "oxford",
       "zk"
-    ]
-  },
-  {
-    "word": "generally",
-    "phonetic": "'dʒenәrәli",
-    "chinese": "adv. 通常, 逐渐地, 普遍地",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "aspect",
-    "phonetic": "'æspekt",
-    "chinese": "n. 外观, 方面, 面貌, 方向",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "industrial",
-    "phonetic": "in'dʌstriәl",
-    "chinese": "a. 工业的, 供工业用的, 工业高度发展的, 产业的",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "chairman",
-    "phonetic": "'tʃєәmәn",
-    "chinese": "n. 主席, 会长",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "nearly",
-    "phonetic": "'niәli",
-    "chinese": "adv. 几乎, 密切地",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "remove",
-    "phonetic": "ri'mu:v",
-    "chinese": "vt. 移动, 调动, 除去, 迁移, 开除, 移交",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "gre",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "visit",
-    "phonetic": "'vizit",
-    "chinese": "n. 拜访, 访问, 游览, 视察",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "throw",
-    "phonetic": "θrәu",
-    "chinese": "vt. 投, 掷, 抛, 发射, 摔下, 匆匆穿上(或脱下), 抛弃, 摆脱",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "baby",
-    "phonetic": "'beibi",
-    "chinese": "n. 婴孩",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "sorry",
-    "phonetic": "'sɒri",
-    "chinese": "a. 难过的, 悲哀的, 遗憾的",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "daughter",
-    "phonetic": "'dɒ:tә",
-    "chinese": "n. 女儿",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "sun",
-    "phonetic": "sʌn",
-    "chinese": "n. 太阳, 日, 日光, 阳光",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "united",
-    "phonetic": "ju:'naitid",
-    "chinese": "a. 联合的, 团结的, 一致的, 和睦的",
-    "tags": [
-      "ecdict",
-      "ielts",
-      "oxford"
-    ]
-  },
-  {
-    "word": "box",
-    "phonetic": "bɒks",
-    "chinese": "n. 盒子, 箱, 方框, 一巴掌",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "exist",
-    "phonetic": "ig'zist",
-    "chinese": "vi. 存在, 生存, 发生",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ky",
-      "oxford",
-      "toefl"
-    ]
-  },
-  {
-    "word": "river",
-    "phonetic": "'rivә",
-    "chinese": "n. 河, 江",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "zk"
-    ]
-  },
-  {
-    "word": "dead",
-    "phonetic": "ded",
-    "chinese": "a. 死的, 不活泼的, 麻木的, 熄灭的",
-    "tags": [
-      "ecdict",
-      "gk",
-      "oxford",
-      "toefl",
-      "zk"
-    ]
-  },
-  {
-    "word": "customer",
-    "phonetic": "'kʌstәmә",
-    "chinese": "n. 消费者",
-    "tags": [
-      "cet4",
-      "cet6",
-      "ecdict",
-      "gk",
-      "ielts",
-      "ky",
-      "oxford",
-      "toefl"
     ]
   }
 ]

@@ -52,7 +52,8 @@ describe("travel journal home", () => {
     expect(view.querySelector('[data-mastery="mastered"]')).toBeNull();
     expect(view.querySelector('[data-mastery="practiced"]')?.textContent).toBe("练习中 2/15");
     expect(view.textContent).not.toContain("100%");
-    expect(view.querySelectorAll("[data-route-node]")).toHaveLength(12);
+    expect(view.querySelectorAll("[data-route-node]")).toHaveLength(13);
+    expect(view.querySelector(".route-map")?.getAttribute("aria-label")).toBe("13 天训练路线");
   });
 
   it("only stamps a city mastered when every authored phrase is mastered", async () => {

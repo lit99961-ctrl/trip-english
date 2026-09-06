@@ -2,6 +2,33 @@ import { describe, expect, it } from "vitest";
 import { missionSchema, phraseSchema } from "../../src/domain/content-schema";
 
 describe("missionSchema", () => {
+  it("accepts only well-formed listening scenarios", () => {
+    const phrase = {
+      id: "listen-phrase", english: "Please help.", chinese: "请帮忙。", intent: "help",
+      keywords: ["help"], requiredKeywordGroups: [["help"]], recovery: true
+    };
+    const scenario = {
+      id: "room-ready", transcript: "Your room is ready now.", meaningZh: "房间已经准备好了。",
+      distractorsZh: ["房间还没准备好。", "早餐在七点。"], keywords: ["room", "ready"]
+    };
+    const mission = {
+      id: "listen-mission", kind: "travel", titleZh: "听力", city: "Rome",
+      productionPhrases: Array.from({ length: 5 }, (_, index) => ({ ...phrase, id: `${phrase.id}-${index}` })),
+      recognitionWords: ["ready"], listeningScenarios: [scenario, { ...scenario, id: "room-later" }, { ...scenario, id: "breakfast" }],
+      exercises: Array.from({ length: 5 }, (_, index) => ({ id: `listen-${index}`, type: "intent", promptZh: "听懂意思" }))
+    };
+
+    expect(missionSchema.safeParse(mission).success).toBe(true);
+    expect(missionSchema.safeParse({
+      ...mission,
+      listeningScenarios: [{ ...scenario, distractorsZh: [scenario.meaningZh, "早餐在七点。"] }, ...mission.listeningScenarios.slice(1)]
+    }).success).toBe(false);
+    expect(missionSchema.safeParse({
+      ...mission,
+      listeningScenarios: [{ ...scenario, keywords: ["one", "two", "three", "four", "five"] }, ...mission.listeningScenarios.slice(1)]
+    }).success).toBe(false);
+  });
+
   it("requires a recovery phrase and five to eight production phrases", () => {
     const invalid = { id: "hotel", titleZh: "酒店", productionPhrases: [], exercises: [] };
 

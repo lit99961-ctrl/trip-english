@@ -15,17 +15,17 @@ describe("itinerary course coverage", () => {
   }).passed;
 
   it("has the required mission and emergency phrase counts", () => {
-    expect(travelMissions).toHaveLength(12);
+    expect(travelMissions).toHaveLength(13);
     expect(businessMissions).toHaveLength(3);
     expect(emergencyPhrases).toHaveLength(50);
   });
 
-  it("assembles exactly twelve travel sessions with business readings embedded only in 4, 8, and 11", () => {
-    expect(courseSessions).toHaveLength(12);
-    expect(courseSessions.map((session) => session.sessionNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  it("assembles thirteen travel sessions with business readings embedded only in 4, 8, and 11", () => {
+    expect(courseSessions).toHaveLength(13);
+    expect(courseSessions.map((session) => session.sessionNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     expect(courseSessions.every((session) => session.travelMission.kind === "travel")).toBe(true);
     expect(courseSessions.filter((session) => session.businessMission).map((session) => session.sessionNumber)).toEqual([4, 8, 11]);
-    expect(allMissions).toHaveLength(15);
+    expect(allMissions).toHaveLength(16);
   });
 
   it("uses score-compatible keyword alternatives for every model phrase", () => {
@@ -105,13 +105,13 @@ describe("itinerary course coverage", () => {
     }
   });
 
-  it("uses exactly thirty unique active production targets", () => {
+  it("uses exactly thirty-three unique active production targets", () => {
     const targets = [...travelMissions, ...businessMissions]
       .flatMap((mission) => mission.productionPhrases)
       .filter((phrase) => phrase.activeTarget);
 
-    expect(targets).toHaveLength(30);
-    expect(new Set(targets.map((phrase) => phrase.id)).size).toBe(30);
+    expect(targets).toHaveLength(33);
+    expect(new Set(targets.map((phrase) => phrase.id)).size).toBe(33);
   });
 
   it("requires every active target to express more than one semantic component", () => {
@@ -147,7 +147,7 @@ describe("itinerary course coverage", () => {
     expect(passesPhrase("milan-swiss-transfer-change", "where change")).toBe(false);
   });
 
-  it("keeps the explicit twenty-eight travel target suffixes", () => {
+  it("keeps the existing targets and appends three supermarket targets", () => {
     expect(travelMissions.flatMap((mission) => mission.productionPhrases)
       .filter((phrase) => phrase.activeTarget)
       .map((phrase) => phrase.id)).toEqual([
@@ -162,7 +162,8 @@ describe("itinerary course coverage", () => {
       "milan-swiss-transfer-interlaken", "milan-swiss-transfer-change",
       "swiss-mountain-transit-train", "swiss-mountain-transit-cable",
       "shopping-tax-refund-size", "shopping-tax-refund-color",
-      "urgent-help-lost-separated", "urgent-help-phone", "urgent-help-bag"
+      "urgent-help-lost-separated", "urgent-help-phone", "urgent-help-bag",
+      "supermarket-groceries-price", "supermarket-groceries-kilo", "supermarket-groceries-card"
     ]);
   });
 
@@ -200,7 +201,8 @@ describe("itinerary course coverage", () => {
     expect(travelMissions.map((mission) => mission.id)).toEqual([
       "hk-checkin", "helsinki-transfer", "rome-arrival", "hotel-checkin",
       "directions-tickets", "restaurant", "italy-high-speed-rail", "venice-vaporetto",
-      "milan-swiss-transfer", "swiss-mountain-transit", "shopping-tax-refund", "urgent-help"
+      "milan-swiss-transfer", "swiss-mountain-transit", "shopping-tax-refund", "urgent-help",
+      "supermarket-groceries"
     ]);
     expect(businessMissions.map((mission) => mission.id)).toEqual([
       "email-action", "internet-headline", "message-intent"
@@ -228,12 +230,36 @@ describe("itinerary course coverage", () => {
       mission.exercises.filter((exercise) => exercise.type === "reading")
     );
 
-    expect(readings).toHaveLength(12);
-    expect(new Set(readings.map((exercise) => exercise.readingText)).size).toBe(12);
+    expect(readings).toHaveLength(13);
+    expect(new Set(readings.map((exercise) => exercise.readingText)).size).toBe(13);
     for (const exercise of readings) {
       expect(exercise.readingText).toMatch(/\S/);
       expect(exercise.readingText!.length).toBeGreaterThanOrEqual(12);
       expect(exercise.readingText).not.toBe(exercise.promptZh);
+    }
+  });
+
+  it("provides three practical staff answers for every priority travel scene", () => {
+    for (const missionId of [
+      "hotel-checkin", "restaurant", "directions-tickets",
+      "italy-high-speed-rail", "supermarket-groceries"
+    ]) {
+      const mission = travelMissions.find((item) => item.id === missionId)!;
+      expect(mission.listeningScenarios, missionId).toHaveLength(3);
+      expect(new Set(mission.listeningScenarios!.map((scenario) => scenario.id)).size).toBe(3);
+      expect(mission.listeningScenarios!.every((scenario) => scenario.distractorsZh.length === 2)).toBe(true);
+    }
+  });
+
+  it("covers the complete supermarket transaction", () => {
+    const mission = travelMissions.find((item) => item.id === "supermarket-groceries")!;
+    const text = [
+      ...mission.productionPhrases.flatMap((phrase) => [phrase.english, ...phrase.keywords]),
+      ...mission.recognitionWords,
+      ...mission.exercises.flatMap((exercise) => exercise.type === "reading" ? [exercise.readingText] : [])
+    ].join(" ").toLowerCase();
+    for (const required of ["price", "kilo", "bag", "card", "self-checkout", "weigh", "receipt"]) {
+      expect(text, required).toContain(required);
     }
   });
 
