@@ -68,7 +68,7 @@
 **Files:**
 - Modify: Git history for `public/audio/**` and `scripts/generate-fixed-audio.mjs`
 
-- [ ] Run full unit tests, production build, dependency audit, secret scan, and `git diff --check`.
-- [ ] Commit the clean tree.
-- [ ] Remove fixed-audio files and generator from every reachable commit while preserving unrelated history.
-- [ ] Force-push the rewritten private `main`, then verify repository visibility and absence of prohibited paths.
+- [x] Run full unit tests, production build, dependency audit, secret scan, and `git diff --check`.
+- [x] Commit the clean tree.
+- [x] Remove fixed-audio files and generator from every reachable commit while preserving unrelated history.
+- [x] Force-push the rewritten private `main`, then verify repository visibility and absence of prohibited paths.
