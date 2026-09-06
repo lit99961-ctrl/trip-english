@@ -2,6 +2,12 @@
   "name": "trip-english",
   "private": true,
   "version": "0.1.0",
+  "description": "A1 travel English speaking game for Italy and Switzerland",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lit99961-ctrl/trip-english.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
