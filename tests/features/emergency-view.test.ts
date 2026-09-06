@@ -62,6 +62,43 @@ describe("emergency kit and light lookup", () => {
     expect(first.querySelectorAll("button[aria-label]")).toHaveLength(4);
   });
 
+  it("reports favorite persistence failure truthfully and allows retry", async () => {
+    const onSavePhrase = vi.fn()
+      .mockRejectedValueOnce(new Error("quota"))
+      .mockResolvedValueOnce(undefined);
+    const view = renderEmergency({ speech: speech(), dictionary, onSavePhrase });
+    document.body.append(view);
+    const save = view.querySelector<HTMLButtonElement>("[data-emergency-card] [data-save-phrase]")!;
+    save.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(view.textContent).toContain("收藏失败");
+    expect(save.textContent).toBe("收藏");
+    expect(save.disabled).toBe(false);
+
+    save.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(save.textContent).toBe("已收藏");
+    expect(onSavePhrase).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows persisted favorites and reports lookup save failures", async () => {
+    const onSaveLookup = vi.fn(async () => { throw new Error("quota"); });
+    const view = renderEmergency({
+      speech: speech(), dictionary, onSaveLookup,
+      savedPhraseIds: [emergencyPhrases[0]!.id]
+    });
+    document.body.append(view);
+    expect(view.querySelector<HTMLButtonElement>("[data-emergency-card] [data-save-phrase]")?.textContent).toBe("已收藏");
+    const input = view.querySelector<HTMLTextAreaElement>("[data-lookup-input]")!;
+    input.value = "train";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(view.querySelector<HTMLButtonElement>("[data-save-lookup]")!.textContent).toBe("收藏查词");
+    view.querySelector<HTMLButtonElement>("[data-save-lookup]")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(view.textContent).toContain("查词保存失败");
+    expect(view.querySelector<HTMLButtonElement>("[data-save-lookup]")!.disabled).toBe(false);
+  });
+
   it("keeps denied clipboard text editable and gives an explicit system-translation path", async () => {
     const clipboard = { writeText: vi.fn(async () => { throw new Error("denied"); }) };
     const view = renderEmergency({ speech: speech(), dictionary, clipboard });

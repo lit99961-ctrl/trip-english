@@ -30,8 +30,9 @@ export interface EmergencyViewOptions {
   speech: Pick<SpeechPort, "playFixed" | "speak">;
   dictionary?: readonly DictionaryEntry[];
   clipboard?: Pick<Clipboard, "writeText">;
-  onSavePhrase?: (phrase: EmergencyPhrase) => void | Promise<void>;
-  onSaveLookup?: (words: readonly LookupWord[]) => void | Promise<void>;
+  savedPhraseIds?: readonly string[];
+  onSavePhrase?: (phrase: EmergencyPhrase) => unknown | Promise<unknown>;
+  onSaveLookup?: (words: readonly LookupWord[], text: string) => unknown | Promise<unknown>;
 }
 
 const categoryLabels: Record<EmergencyCategory, string> = {
@@ -88,6 +89,7 @@ export function renderEmergency(options: EmergencyViewOptions): HTMLElement {
   cards.className = "card-list";
   const status = document.createElement("p");
   status.setAttribute("role", "status");
+  const savedPhraseIds = new Set(options.savedPhraseIds ?? []);
 
   const report = (message: string, error = false): void => {
     status.textContent = message;
@@ -149,7 +151,24 @@ export function renderEmergency(options: EmergencyViewOptions): HTMLElement {
       slow.setAttribute("aria-label", `慢速播放：${phrase.english}`);
       const copyButton = button("复制", () => copy(phrase.english));
       copyButton.setAttribute("aria-label", `复制：${phrase.english}`);
-      const saveButton = button("收藏", () => invoke(() => options.onSavePhrase?.(phrase), "已收藏。"));
+      const saveButton = button(savedPhraseIds.has(phrase.id) ? "已收藏" : "收藏", () => {
+        if (!options.onSavePhrase || savedPhraseIds.has(phrase.id)) return;
+        saveButton.disabled = true;
+        try {
+          void Promise.resolve(options.onSavePhrase(phrase)).then(() => {
+            savedPhraseIds.add(phrase.id);
+            saveButton.textContent = "已收藏";
+            report("已收藏，并会包含在进度备份中。");
+          }).catch(() => report("收藏失败，请重试。", true)).finally(() => {
+            saveButton.disabled = savedPhraseIds.has(phrase.id);
+          });
+        } catch {
+          saveButton.disabled = false;
+          report("收藏失败，请重试。", true);
+        }
+      });
+      saveButton.dataset.savePhrase = "";
+      saveButton.disabled = savedPhraseIds.has(phrase.id);
       saveButton.setAttribute("aria-label", `收藏：${phrase.english}`);
       actions.append(
         normal,
@@ -201,7 +220,21 @@ export function renderEmergency(options: EmergencyViewOptions): HTMLElement {
       button("慢速", () => invoke(() => options.speech.speak(result.normalizedText, 0.75), "朗读完成。"))
     );
     if (result.words.length > 0) {
-      actions.append(button("加入复习", () => invoke(() => options.onSaveLookup?.(result.words), "已加入复习。")));
+      const saveLookup = button("收藏查词", () => {
+        if (!options.onSaveLookup) return;
+        saveLookup.disabled = true;
+        try {
+          void Promise.resolve(options.onSaveLookup(result.words, result.normalizedText))
+            .then(() => report("查词已收藏，并会包含在进度备份中。"))
+            .catch(() => report("查词保存失败，请重试。", true))
+            .finally(() => { saveLookup.disabled = false; });
+        } catch {
+          saveLookup.disabled = false;
+          report("查词保存失败，请重试。", true);
+        }
+      });
+      saveLookup.dataset.saveLookup = "";
+      actions.append(saveLookup);
     }
     if (result.canCopyForSystemTranslation) {
       const system = button("复制到系统翻译", () => copy(result.normalizedText));

@@ -414,6 +414,14 @@ class FaultInjectingRepository implements ProgressRepository {
     return this.load();
   }
 
+  public async savePhraseId(): Promise<LearnerProgressV1> {
+    return this.load();
+  }
+
+  public async saveLookup(): Promise<LearnerProgressV1> {
+    return this.load();
+  }
+
   public async saveRecording(): Promise<void> {}
   public async loadRecording(): Promise<Blob | undefined> {
     return undefined;

@@ -55,19 +55,26 @@ function missionForSession(progress: LearnerProgressV1, sessionIndex: number): D
   return session.travelMission;
 }
 
-function strongestMastery(
+function aggregateMastery(
   progress: LearnerProgressV1,
-  missionIds: readonly string[]
-): keyof typeof masteryLabels | undefined {
+  missions: readonly DeepReadonly<Mission>[]
+): { level: keyof typeof masteryLabels; label: string } | undefined {
   const ranks = ["introduced", "practiced", "recalled", "mastered"] as const;
-  const classes = missionIds.flatMap((id) =>
-    Object.values(progress.sessions[id]?.phraseClasses ?? {})
+  const authoredPhraseIds = missions.flatMap((mission) =>
+    mission.productionPhrases.map((phrase) => phrase.id)
   );
-  for (let index = ranks.length - 1; index >= 0; index -= 1) {
-    const rank = ranks[index]!;
-    if (classes.includes(rank)) return rank;
+  const classesByPhrase = Object.assign({}, ...missions.map((mission) =>
+    progress.sessions[mission.id]?.phraseClasses ?? {}
+  )) as Record<string, keyof typeof masteryLabels>;
+  const classes = authoredPhraseIds.flatMap((phraseId) =>
+    classesByPhrase[phraseId] ? [classesByPhrase[phraseId]] : []
+  );
+  if (classes.length === 0) return undefined;
+  if (classes.length < authoredPhraseIds.length) {
+    return { level: "practiced", label: `${masteryLabels.practiced} ${classes.length}/${authoredPhraseIds.length}` };
   }
-  return undefined;
+  const lowestRank = ranks.find((rank) => classes.includes(rank)) ?? "mastered";
+  return { level: lowestRank, label: masteryLabels[lowestRank] };
 }
 
 export async function renderHome(options: HomeViewOptions): Promise<HTMLElement> {
@@ -109,15 +116,15 @@ export async function renderHome(options: HomeViewOptions): Promise<HTMLElement>
     if (index === sessionIndex) node.setAttribute("aria-current", "step");
     const city = document.createElement("span");
     city.textContent = session.travelMission.city;
-    const mastery = strongestMastery(progress, [
-      session.travelMission.id,
-      ...(session.businessMission ? [session.businessMission.id] : [])
+    const mastery = aggregateMastery(progress, [
+      session.travelMission,
+      ...(session.businessMission ? [session.businessMission] : [])
     ]);
     if (mastery) {
       const stamp = document.createElement("small");
       stamp.className = "city-stamp";
-      stamp.dataset.mastery = mastery;
-      stamp.textContent = masteryLabels[mastery];
+      stamp.dataset.mastery = mastery.level;
+      stamp.textContent = mastery.label;
       node.append(city, stamp);
     } else {
       node.append(city);
@@ -127,7 +134,7 @@ export async function renderHome(options: HomeViewOptions): Promise<HTMLElement>
 
   const review = document.createElement("p");
   review.className = "metric-chip";
-  review.textContent = `待复习 ${dueCount}`;
+  review.textContent = `待复习 ${dueCount} · 收藏 ${progress.savedPhraseIds.length}`;
   const start = document.createElement("button");
   start.type = "button";
   start.className = "primary-action";

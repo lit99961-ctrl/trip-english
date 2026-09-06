@@ -46,6 +46,12 @@ const phraseReviewSchema = z.object({
   projectionLegacyDueAt: isoDateTime.optional()
 }).strict();
 
+const lookupHistoryEntrySchema = z.object({
+  text: z.string().trim().min(1).max(500),
+  knownWords: z.array(z.string().regex(/^[a-z]+(?:'[a-z]+)?$/)).max(100),
+  savedAt: isoDateTime
+}).strict();
+
 export const learnerProgressV1Schema = z.object({
   schemaVersion: z.literal(1),
   startedAt: isoDateTime,
@@ -53,6 +59,8 @@ export const learnerProgressV1Schema = z.object({
   sessions: z.record(z.string(), sessionSchema),
   phraseReviews: z.record(z.string(), phraseReviewSchema),
   savedPhraseIds: z.array(z.string()),
+  knownWords: z.array(z.string().regex(/^[a-z]+(?:'[a-z]+)?$/)).optional(),
+  lookupHistory: z.array(lookupHistoryEntrySchema).max(50).optional(),
   speakingSeconds: z.number().nonnegative(),
   hintCount: z.number().int().nonnegative(),
   promptFreeScenarioIds: z.array(z.string()),

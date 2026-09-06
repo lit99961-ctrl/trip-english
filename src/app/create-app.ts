@@ -1,10 +1,10 @@
 import { createElement } from "../ui/dom";
 import { allMissions } from "../content/catalog";
 import { renderCalibration } from "../features/calibration/calibration-view";
-import { renderEmergency, type LookupWord } from "../features/emergency/emergency-view";
+import { lookupText, renderEmergency } from "../features/emergency/emergency-view";
 import { renderHome } from "../features/home/home-view";
-import { renderLesson, type LessonView } from "../features/lesson/lesson-view";
-import { renderProgress, type ProgressView } from "../features/progress/progress-view";
+import { renderLesson } from "../features/lesson/lesson-view";
+import { renderProgress } from "../features/progress/progress-view";
 import { SelectionController } from "../selection/selection-controller";
 import type { SpeechPort } from "../speech/speech-port";
 import type { ProgressRepository } from "../storage/progress-repository";
@@ -46,20 +46,6 @@ export interface TravelEnglishApp extends HTMLElement {
   dispose(): void;
 }
 
-const savedLookupKey = "trip-english-saved-lookups";
-
-function saveLocally(values: readonly string[]): void {
-  try {
-    const previous = JSON.parse(localStorage.getItem(savedLookupKey) ?? "[]") as unknown;
-    const stored = Array.isArray(previous)
-      ? previous.filter((value): value is string => typeof value === "string")
-      : [];
-    localStorage.setItem(savedLookupKey, JSON.stringify([...new Set([...stored, ...values])]));
-  } catch {
-    throw new Error("local save failed");
-  }
-}
-
 export function createApp(dependencies: AppDependencies): TravelEnglishApp {
   const shell = createAppShell() as TravelEnglishApp;
   const outlet = shell.querySelector<HTMLElement>("#route-outlet")!;
@@ -71,7 +57,12 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
     void currentView?.dispose?.();
     currentView = view;
     outlet.replaceChildren(view);
-    view.querySelector<HTMLElement>("h1")?.focus();
+    const heading = view.querySelector<HTMLElement>("h1");
+    if (heading) heading.tabIndex = -1;
+    queueMicrotask(() => {
+      if (heading?.isConnected) heading.focus();
+      else if (outlet.isConnected) outlet.focus();
+    });
   };
 
   const renderRoute = async (route: AppRoute): Promise<void> => {
@@ -90,14 +81,20 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
         } else {
           view = await renderHome({
             repository: dependencies.repository,
-            onStartMission: (missionId) => { void showMission(missionId); }
+            onStartMission: (missionId) => { window.location.hash = `#/lesson/${missionId}`; }
           });
         }
       } else if (route === "#/emergency") {
+        const progress = await dependencies.repository.load();
         view = renderEmergency({
           speech: dependencies.speech,
-          onSavePhrase: (phrase) => saveLocally([phrase.id]),
-          onSaveLookup: (words: readonly LookupWord[]) => saveLocally(words.map((word) => word.word))
+          savedPhraseIds: progress.savedPhraseIds,
+          onSavePhrase: (phrase) => dependencies.repository.savePhraseId(phrase.id),
+          onSaveLookup: (words, text) => dependencies.repository.saveLookup({
+            text,
+            knownWords: words.map((word) => word.normalized),
+            savedAt: new Date().toISOString()
+          })
         });
         if (pendingLookup) {
           const input = view.querySelector<HTMLTextAreaElement>("[data-lookup-input]");
@@ -107,12 +104,34 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
           }
           pendingLookup = "";
         }
-      } else {
+      } else if (route === "#/progress") {
         view = await renderProgress({
           repository: dependencies.repository,
           speech: dependencies.speech,
           ...(dependencies.requestPersistence ? { requestPersistence: dependencies.requestPersistence } : {})
         });
+      } else {
+        const missionId = route.slice("#/lesson/".length);
+        const mission = allMissions.find((candidate) => candidate.id === missionId);
+        if (!mission) {
+          const invalid = document.createElement("section");
+          const invalidHeading = document.createElement("h1");
+          invalidHeading.textContent = "任务不存在";
+          const back = document.createElement("a");
+          back.href = "#/home";
+          back.textContent = "返回首页";
+          invalid.append(invalidHeading, back);
+          view = invalid;
+        } else {
+          const progress = await dependencies.repository.load();
+          view = renderLesson({
+            mission,
+            progress,
+            speech: dependencies.speech,
+            persistence: dependencies.repository,
+            onComplete: () => { window.location.hash = "#/home"; }
+          });
+        }
       }
       if (version !== renderVersion) {
         await view.dispose?.();
@@ -138,33 +157,6 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
     }
   };
 
-  const showMission = async (missionId: string): Promise<void> => {
-    const mission = allMissions.find((candidate) => candidate.id === missionId);
-    if (!mission) return;
-    const version = ++renderVersion;
-    outlet.setAttribute("aria-busy", "true");
-    try {
-      const progress = await dependencies.repository.load();
-      if (version !== renderVersion) return;
-      const lesson: LessonView = renderLesson({
-        mission,
-        progress,
-        speech: dependencies.speech,
-        persistence: dependencies.repository,
-        onComplete: () => { window.location.hash = "#/home"; void renderRoute("#/home"); }
-      });
-      replaceView(lesson);
-    } catch {
-      if (version !== renderVersion) return;
-      const error = document.createElement("p");
-      error.setAttribute("role", "alert");
-      error.textContent = "任务暂时无法打开，请返回首页重试。";
-      replaceView(error);
-    } finally {
-      if (version === renderVersion) outlet.removeAttribute("aria-busy");
-    }
-  };
-
   const stopRouter = startRouter((route) => { void renderRoute(route); });
   const navigate = (event: Event): void => {
     const href = (event as CustomEvent<{ href?: string }>).detail?.href;
@@ -180,7 +172,15 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
       if (window.location.hash === "#/emergency") void renderRoute("#/emergency");
       else window.location.hash = "#/emergency";
     },
-    onSave: (text) => saveLocally([text])
+    onSave: async (text) => {
+      const result = lookupText(text);
+      if (result.words.length === 0) throw new Error("selected text has no known words");
+      await dependencies.repository.saveLookup({
+        text: result.normalizedText,
+        knownWords: result.words.map((word) => word.normalized),
+        savedAt: new Date().toISOString()
+      });
+    }
   });
   shell.dispose = () => {
     renderVersion += 1;

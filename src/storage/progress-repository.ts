@@ -28,6 +28,12 @@ export interface SaveCalibrationResultInput {
   recordingKeys: string[];
 }
 
+export interface SaveLookupInput {
+  text: string;
+  knownWords: string[];
+  savedAt: string;
+}
+
 export type RestoreToken = string;
 
 export type RestoreRollbackOutcome =
@@ -43,6 +49,8 @@ export interface ProgressRepository {
   load(): Promise<LearnerProgressV1>;
   saveExerciseResult(input: SaveExerciseResultInput): Promise<LearnerProgressV1>;
   saveCalibrationResult(input: SaveCalibrationResultInput): Promise<LearnerProgressV1>;
+  savePhraseId(phraseId: string): Promise<LearnerProgressV1>;
+  saveLookup(input: SaveLookupInput): Promise<LearnerProgressV1>;
   saveRecording(key: string, recording: Blob): Promise<void>;
   loadRecording(key: string): Promise<Blob | undefined>;
   beginRestore(progress: LearnerProgressV1): Promise<RestoreToken>;

@@ -123,6 +123,9 @@ export async function renderProgress(options: ProgressViewOptions): Promise<Prog
     metric("独立完成", `无提示场景 ${new Set(progress.promptFreeScenarioIds).size}`),
     metric("提示趋势", hintTrend(progress))
   );
+  const collection = document.createElement("p");
+  collection.className = "metric-chip";
+  collection.textContent = `收藏：句卡 ${progress.savedPhraseIds.length} · 单词 ${progress.knownWords?.length ?? 0}`;
 
   const persistenceStatus = document.createElement("p");
   persistenceStatus.className = "metric-chip";
@@ -230,6 +233,78 @@ export async function renderProgress(options: ProgressViewOptions): Promise<Prog
   const restoreInput = document.createElement("input");
   restoreInput.type = "file";
   restoreInput.accept = "application/json,.json";
+  const restorePreview = document.createElement("div");
+  restorePreview.dataset.restorePreview = "";
+  let preparedRestore: { text: string; preview: BackupPreview } | undefined;
+  const clearPreparedRestore = (): void => {
+    preparedRestore = undefined;
+    restorePreview.replaceChildren();
+    restoreInput.disabled = false;
+    restoreInput.value = "";
+  };
+  const showRestorePreview = (text: string, preview: BackupPreview): void => {
+    preparedRestore = { text, preview };
+    const heading = document.createElement("h3");
+    heading.textContent = "确认替换当前进度";
+    const summary = document.createElement("p");
+    summary.textContent = [
+      `备份日期 ${preview.exportedAt.slice(0, 10)}`,
+      `课程版本 ${preview.courseVersion}`,
+      `任务记录 ${preview.missionCount}`,
+      `口语 ${preview.speakingMinutes} 分钟`
+    ].join(" · ");
+    const warning = document.createElement("p");
+    warning.textContent = "确认后会用这份备份替换当前学习进度。";
+    const actions = document.createElement("div");
+    actions.className = "compact-actions";
+    const confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.dataset.confirmRestore = "";
+    confirmButton.textContent = "确认替换";
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.dataset.cancelRestore = "";
+    cancelButton.textContent = "取消";
+    cancelButton.addEventListener("click", () => {
+      clearPreparedRestore();
+      dataStatus.setAttribute("role", "status");
+      dataStatus.textContent = "已取消恢复，当前进度未改变。";
+    });
+    confirmButton.addEventListener("click", async () => {
+      const prepared = preparedRestore;
+      if (!prepared) return;
+      confirmButton.disabled = true;
+      cancelButton.disabled = true;
+      try {
+        const confirmed = await (options.confirmRestore?.(prepared.preview) ?? true);
+        if (!confirmed) {
+          clearPreparedRestore();
+          dataStatus.setAttribute("role", "status");
+          dataStatus.textContent = "已取消恢复，当前进度未改变。";
+          return;
+        }
+        const result = await restoreBackup(options.repository, prepared.text, true);
+        if (result.restored) {
+          progress = result.progress;
+          clearPreparedRestore();
+          dataStatus.setAttribute("role", "status");
+          dataStatus.textContent = "恢复完成。返回首页即可从备份位置继续。";
+        } else {
+          confirmButton.disabled = false;
+          cancelButton.disabled = false;
+          dataStatus.setAttribute("role", "alert");
+          dataStatus.textContent = "恢复被更新的数据中止，请重新选择备份。";
+        }
+      } catch {
+        confirmButton.disabled = false;
+        cancelButton.disabled = false;
+        dataStatus.setAttribute("role", "alert");
+        dataStatus.textContent = "恢复失败，备份预览仍保留，可以重试或取消。";
+      }
+    });
+    actions.append(confirmButton, cancelButton);
+    restorePreview.replaceChildren(heading, summary, warning, actions);
+  };
   restoreInput.addEventListener("change", async () => {
     const file = restoreInput.files?.[0];
     if (!file) return;
@@ -237,26 +312,20 @@ export async function renderProgress(options: ProgressViewOptions): Promise<Prog
     try {
       const text = await readBackupText(file);
       const inspected = inspectBackupImport(text);
-      const confirm = options.confirmRestore ?? ((preview: BackupPreview) =>
-        window.confirm(`确认恢复 ${preview.missionCount} 个任务的记录？当前记录会被替换。`));
-      const result = await restoreBackup(options.repository, text, () => confirm(inspected.preview));
-      if (result.restored) {
-        progress = result.progress;
-        dataStatus.setAttribute("role", "status");
-        dataStatus.textContent = "恢复完成。返回首页即可从备份位置继续。";
-      } else {
-        dataStatus.textContent = result.reason === "cancelled" ? "已取消恢复。" : "恢复被更新的数据中止，请重试。";
-      }
+      showRestorePreview(text, inspected.preview);
+      dataStatus.setAttribute("role", "status");
+      dataStatus.textContent = "备份已验证，请核对摘要后确认。";
     } catch {
+      preparedRestore = undefined;
+      restorePreview.replaceChildren();
       dataStatus.setAttribute("role", "alert");
       dataStatus.textContent = "无法恢复：请选择由本应用生成的有效备份。";
     } finally {
       restoreInput.disabled = false;
-      restoreInput.value = "";
     }
   });
   restoreLabel.append(restoreInput);
-  dataSection.append(dataHeading, backupButton, restoreLabel, dataStatus);
-  root.append(heading, metrics, persistenceStatus, recordingSection, dataSection);
+  dataSection.append(dataHeading, backupButton, restoreLabel, restorePreview, dataStatus);
+  root.append(heading, metrics, collection, persistenceStatus, recordingSection, dataSection);
   return root;
 }

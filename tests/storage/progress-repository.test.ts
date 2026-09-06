@@ -78,6 +78,34 @@ describe("LearnerProgressV1 migration", () => {
 });
 
 describe("IndexedDbProgressRepository", () => {
+  test("atomically saves phrase favorites and normalized lookup history", async () => {
+    const repository = createRepository();
+
+    await repository.savePhraseId("em-help-112");
+    await repository.savePhraseId("em-help-112");
+    await repository.saveLookup({
+      text: "  The TRAIN  ",
+      knownWords: ["Train", "the", "train"],
+      savedAt: "2026-09-05T00:00:00.000Z"
+    });
+
+    await expect(repository.load()).resolves.toMatchObject({
+      savedPhraseIds: ["em-help-112"],
+      knownWords: ["the", "train"],
+      lookupHistory: [{
+        text: "The TRAIN",
+        knownWords: ["the", "train"],
+        savedAt: "2026-09-05T00:00:00.000Z"
+      }]
+    });
+  });
+
+  test("rejects empty or noncanonical lookup persistence input", async () => {
+    const repository = createRepository();
+    await expect(repository.savePhraseId(" ")).rejects.toThrow();
+    await expect(repository.saveLookup({ text: " ", knownWords: [], savedAt: "bad" })).rejects.toThrow();
+  });
+
   test("a fresh repository returns valid v1 defaults", async () => {
     const repository = createRepository();
 

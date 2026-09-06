@@ -10,6 +10,7 @@ function repository(progress = createLearnerProgressV1()): ProgressRepository {
   return {
     load: vi.fn(async () => progress),
     saveExerciseResult: vi.fn(), saveCalibrationResult: vi.fn(),
+    savePhraseId: vi.fn(async () => progress), saveLookup: vi.fn(async () => progress),
     saveRecording: vi.fn(async () => undefined), loadRecording: vi.fn(async () => undefined),
     beginRestore: vi.fn(async () => "restore-token"),
     rollbackRestore: vi.fn(async () => ({ status: "rolled-back" as const })),
@@ -34,6 +35,8 @@ describe("measured progress", () => {
     progress.speakingSeconds = 3_660;
     progress.promptFreeScenarioIds = ["hotel-roleplay", "train-roleplay"];
     progress.hintCount = 4;
+    progress.savedPhraseIds = ["em-help-112"];
+    progress.knownWords = ["train", "ticket"];
     const targets = allMissions.flatMap((mission) => mission.productionPhrases).filter((phrase) => phrase.activeTarget);
     progress.sessions[allMissions[0]!.id] = {
       missionId: allMissions[0]!.id,
@@ -54,6 +57,7 @@ describe("measured progress", () => {
     expect(view.textContent).toContain("无提示场景 2");
     expect(view.textContent).toContain("已授权持久存储");
     expect(view.textContent).toContain("提示趋势");
+    expect(view.textContent).toContain("句卡 1 · 单词 2");
   });
 
   it("compares per-attempt hint use rather than unequal raw totals", async () => {
@@ -73,10 +77,14 @@ describe("measured progress", () => {
     expect(view.textContent).toContain("每次提示从 2 降到 0");
   });
 
-  it("previews a valid backup before confirmation and rejects invalid input", async () => {
+  it("shows an in-page validated preview before explicit restore confirmation", async () => {
     const current = createLearnerProgressV1(new Date("2026-09-05T00:00:00Z"));
     const replacement = createLearnerProgressV1(new Date("2026-09-01T00:00:00Z"));
     replacement.activeMissionId = "venice-vaporetto";
+    replacement.speakingSeconds = 150;
+    replacement.sessions["venice-vaporetto"] = {
+      missionId: "venice-vaporetto", completedExerciseIds: ["venice-vaporetto-intent"]
+    };
     const repo = repository(current);
     const confirmRestore = vi.fn(async () => true);
     const view = await renderProgress({ repository: repo, speech: speech(), confirmRestore });
@@ -88,7 +96,15 @@ describe("measured progress", () => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(confirmRestore).toHaveBeenCalledWith(expect.objectContaining({ missionCount: 0 }));
+    expect(confirmRestore).not.toHaveBeenCalled();
+    expect(repo.beginRestore).not.toHaveBeenCalled();
+    expect(view.textContent).toContain("2026-09-05");
+    expect(view.textContent).toContain("课程版本 1");
+    expect(view.textContent).toContain("任务记录 1");
+    expect(view.textContent).toContain("口语 2.5 分钟");
+    view.querySelector<HTMLButtonElement>("[data-confirm-restore]")!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(confirmRestore).toHaveBeenCalledWith(expect.objectContaining({ missionCount: 1 }));
     expect(repo.beginRestore).toHaveBeenCalledWith(expect.objectContaining({ activeMissionId: "venice-vaporetto" }));
 
     Object.defineProperty(input, "files", { configurable: true, value: [new File(["not json"], "bad.json")] });
@@ -96,5 +112,21 @@ describe("measured progress", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(view.textContent).toContain("无法恢复");
     expect(repo.beginRestore).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a prepared restore without mutating progress", async () => {
+    const repo = repository();
+    const view = await renderProgress({ repository: repo, speech: speech() });
+    document.body.append(view);
+    const input = view.querySelector<HTMLInputElement>('input[type="file"]')!;
+    Object.defineProperty(input, "files", { configurable: true, value: [new File([
+      encodeBackup(createLearnerProgressV1(), { now: () => new Date("2026-09-05T10:00:00Z") })
+    ], "backup.json")] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    view.querySelector<HTMLButtonElement>("[data-cancel-restore]")!.click();
+    expect(repo.beginRestore).not.toHaveBeenCalled();
+    expect(view.textContent).toContain("已取消恢复");
+    expect(input.disabled).toBe(false);
   });
 });

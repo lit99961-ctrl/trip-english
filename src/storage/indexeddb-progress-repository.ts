@@ -18,7 +18,8 @@ import type {
   RestoreRollbackOutcome,
   RestoreToken,
   SaveCalibrationResultInput,
-  SaveExerciseResultInput
+  SaveExerciseResultInput,
+  SaveLookupInput
 } from "./progress-repository";
 
 const DATABASE_VERSION = 1;
@@ -258,6 +259,45 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     await transaction.store.put(nextProgress, PROGRESS_KEY);
     await transaction.done;
     return nextProgress;
+  }
+
+  public async savePhraseId(phraseId: string): Promise<LearnerProgressV1> {
+    const normalized = phraseId.trim();
+    if (!normalized || normalized !== phraseId) throw new Error("phraseId must be trimmed and nonempty");
+    const database = await this.getDatabase();
+    const transaction = database.transaction("progress", "readwrite");
+    const progress = projectReviewHistory(migrateProgress(await transaction.store.get(PROGRESS_KEY), this.now()));
+    const next = migrateProgress({
+      ...progress,
+      savedPhraseIds: [...new Set([...progress.savedPhraseIds, normalized])]
+    }, this.now());
+    await transaction.store.put(next, PROGRESS_KEY);
+    await transaction.done;
+    return next;
+  }
+
+  public async saveLookup(input: SaveLookupInput): Promise<LearnerProgressV1> {
+    const text = input.text.normalize("NFKC").trim().replace(/\s+/g, " ");
+    const savedAt = new Date(input.savedAt);
+    if (!text || text.length > 500 || Number.isNaN(savedAt.getTime()) || savedAt.toISOString() !== input.savedAt) {
+      throw new Error("lookup input is invalid");
+    }
+    const knownWords = [...new Set(input.knownWords.map((word) => word.toLocaleLowerCase("en-US").trim()))].sort();
+    if (knownWords.some((word) => !/^[a-z]+(?:'[a-z]+)?$/.test(word))) {
+      throw new Error("known words must be normalized English words");
+    }
+    const database = await this.getDatabase();
+    const transaction = database.transaction("progress", "readwrite");
+    const progress = projectReviewHistory(migrateProgress(await transaction.store.get(PROGRESS_KEY), this.now()));
+    const history = [...(progress.lookupHistory ?? []), { text, knownWords, savedAt: input.savedAt }].slice(-50);
+    const next = migrateProgress({
+      ...progress,
+      knownWords: [...new Set([...(progress.knownWords ?? []), ...knownWords])].sort(),
+      lookupHistory: history
+    }, this.now());
+    await transaction.store.put(next, PROGRESS_KEY);
+    await transaction.done;
+    return next;
   }
 
   public async saveRecording(key: string, recording: Blob): Promise<void> {
