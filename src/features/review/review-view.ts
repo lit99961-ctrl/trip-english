@@ -31,9 +31,12 @@ export function renderReview(options: ReviewViewOptions): HTMLElement {
   const root = document.createElement("section");
   root.className = "review-view stack";
 
-  const finish = () => options.onComplete?.() ?? root.dispatchEvent(new CustomEvent("app:navigate", {
-    bubbles: true, detail: { href: "#/home" }
-  }));
+  const finish = () => {
+    if (options.onComplete) options.onComplete();
+    else root.dispatchEvent(new CustomEvent("app:navigate", {
+      bubbles: true, detail: { href: "#/home" }
+    }));
+  };
   const play = (text: string, rate: 0.75 | 1) => {
     void options.speech.speak(text, rate).catch(() => {
       const error = document.createElement("p");
