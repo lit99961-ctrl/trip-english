@@ -110,13 +110,20 @@ export function mountOfflineStatus(
 
 export function createOfflineAwareSpeech(
   speech: SpeechPort,
-  isOnline: () => boolean = () => navigator.onLine
+  isOnline: () => boolean = () => navigator.onLine,
+  baseUrl = import.meta.env.BASE_URL
 ): SpeechPort {
   return {
-    playFixed: (src, rate) => speech.playFixed(src, rate),
+    playFixed: (src, rate) => speech.playFixed(resolveAppAssetPath(src, baseUrl), rate),
     speak: (text, rate) => speech.speak(text, rate),
     startRecording: () => speech.startRecording(),
     recognitionMode: () => isOnline() ? speech.recognitionMode() : Promise.resolve("self-rating"),
     recognize: (language) => isOnline() ? speech.recognize(language) : Promise.resolve(null)
   };
+}
+
+export function resolveAppAssetPath(source: string, baseUrl: string): string {
+  if (!source.startsWith("/audio/")) return source;
+  const normalizedBase = `/${baseUrl.split("/").filter(Boolean).join("/")}`;
+  return `${normalizedBase === "/" ? "" : normalizedBase}${source}`;
 }

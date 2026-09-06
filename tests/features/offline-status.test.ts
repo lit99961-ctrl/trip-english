@@ -3,7 +3,8 @@ import {
   createOfflineAwareSpeech,
   countReadyOfflineGroups,
   deriveOfflineState,
-  mountOfflineStatus
+  mountOfflineStatus,
+  resolveAppAssetPath
 } from "../../src/app/offline-status";
 import type { SpeechPort } from "../../src/speech/speech-port";
 
@@ -86,5 +87,10 @@ describe("offline readiness", () => {
     await expect(countReadyOfflineGroups(storage, "/app/")).resolves.toBe(3);
     urls.pop();
     await expect(countReadyOfflineGroups(storage, "/app/")).resolves.toBe(2);
+  });
+
+  it("resolves bundled audio inside a deployment subpath", () => {
+    expect(resolveAppAssetPath("/audio/phrases/hotel.aiff", "/opc/")).toBe("/opc/audio/phrases/hotel.aiff");
+    expect(resolveAppAssetPath("/audio/phrases/hotel.aiff", "/")).toBe("/audio/phrases/hotel.aiff");
   });
 });
