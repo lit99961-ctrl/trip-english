@@ -14,12 +14,24 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto 1fr auto;
   width: min(100%, 430px);
   min-height: 100dvh;
   margin: 0 auto;
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--line);
+}
+
+.offline-status {
+  min-height: 28px;
+  margin: 0;
+  padding: 6px 20px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 72%, white);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 #route-outlet {

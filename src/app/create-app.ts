@@ -18,6 +18,8 @@ const destinations = [
 
 export function createAppShell(): HTMLElement {
   const shell = createElement("div", "app-shell");
+  const offlineStatus = createElement("p", "offline-status");
+  offlineStatus.dataset.offlineStatus = "";
   const outlet = createElement("main");
   outlet.id = "route-outlet";
   outlet.tabIndex = -1;
@@ -32,7 +34,7 @@ export function createAppShell(): HTMLElement {
     navigation.append(link);
   }
 
-  shell.append(outlet, navigation);
+  shell.append(offlineStatus, outlet, navigation);
   return shell;
 }
 
