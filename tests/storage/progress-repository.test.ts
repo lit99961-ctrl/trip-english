@@ -967,6 +967,30 @@ describe("IndexedDbProgressRepository", () => {
     expect(second.dailyPlans?.["2026-09-05"]?.missionIds).toEqual(["hotel", "train", "restaurant"]);
   });
 
+  test("backfills stable daily steps without replacing a legacy mission plan", async () => {
+    const repository = createRepository();
+    await repository.ensureDailyPlan("2026-09-05", ["hotel", "train", "restaurant"]);
+    const steps = [
+      { kind: "mission" as const, missionId: "hotel", mode: "introduction" as const },
+      { kind: "review" as const, slot: "morning" as const },
+      { kind: "review" as const, slot: "midday" as const }
+    ] as const;
+    const backfilled = await repository.ensureDailyPlan(
+      "2026-09-05", ["airport", "shopping", "emergency"], steps
+    );
+    const retried = await repository.ensureDailyPlan(
+      "2026-09-05", ["other-1", "other-2", "other-3"], [
+        { kind: "review", slot: "evening" },
+        { kind: "review", slot: "morning" },
+        { kind: "review", slot: "midday" }
+      ]
+    );
+    expect(backfilled.dailyPlans?.["2026-09-05"]).toEqual({
+      missionIds: ["hotel", "train", "restaurant"], steps: [...steps]
+    });
+    expect(retried.dailyPlans?.["2026-09-05"]).toEqual(backfilled.dailyPlans?.["2026-09-05"]);
+  });
+
   test("advances mission introductions atomically and idempotently", async () => {
     const repository = createRepository();
     const orderedSentenceIds = ["hotel-learn-one", "hotel-learn-two"];

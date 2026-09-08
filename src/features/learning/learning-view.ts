@@ -15,6 +15,8 @@ export interface LearningViewOptions {
   repository: Pick<ProgressRepository, "advanceMissionIntroduction">;
   speech: Pick<SpeechPort, "speak" | "startRecording">;
   onComplete: () => void;
+  mode?: "introduction" | "review";
+  backHref?: "#/home" | "#/sprint";
   now?: () => Date;
   createObjectURL?: (blob: Blob) => string;
   revokeObjectURL?: (url: string) => void;
@@ -24,7 +26,15 @@ export function renderLearning(options: LearningViewOptions): LearningView {
   const sentences = options.mission.learningSentences ?? [];
   if (sentences.length === 0) throw new Error(`mission ${options.mission.id} has no learning content`);
   const orderedSentenceIds = sentences.map((sentence) => sentence.id);
-  let progress = options.progress;
+  let progress = options.mode === "review"
+    ? { ...options.progress, missionIntroductions: {
+        ...options.progress.missionIntroductions,
+        [options.mission.id]: {
+          missionId: options.mission.id, nextSentenceIndex: 0,
+          viewedSentenceIds: [], shadowedSentenceIds: [], completedRecapIndexes: []
+        }
+      } }
+    : options.progress;
   let pending: AdvanceMissionIntroductionInput | undefined;
   let saveError = "";
   let recordedCurrentSentence = false;
@@ -49,6 +59,28 @@ export function renderLearning(options: LearningViewOptions): LearningView {
     catch { reportPlaybackError(); }
   };
   const save = async (input: AdvanceMissionIntroductionInput): Promise<boolean> => {
+    if (options.mode === "review") {
+      const current = progress.missionIntroductions?.[options.mission.id]!;
+      const next = structuredClone(current);
+      if (input.kind === "sentence") {
+        next.nextSentenceIndex += 1;
+        next.viewedSentenceIds.push(input.sentenceId);
+        if (input.shadowed) next.shadowedSentenceIds.push(input.sentenceId);
+      } else if (input.kind === "recap") {
+        next.completedRecapIndexes.push(input.atIndex);
+      } else {
+        return true;
+      }
+      progress = { ...progress, missionIntroductions: {
+        ...progress.missionIntroductions, [options.mission.id]: next
+      } };
+      recordedCurrentSentence = false;
+      if (recordingUrl) {
+        (options.revokeObjectURL ?? URL.revokeObjectURL)(recordingUrl);
+        recordingUrl = undefined;
+      }
+      return true;
+    }
     pending ??= input;
     try {
       progress = await options.repository.advanceMissionIntroduction(pending);
@@ -88,7 +120,7 @@ export function renderLearning(options: LearningViewOptions): LearningView {
   };
   const backLink = (): HTMLAnchorElement => {
     const back = document.createElement("a");
-    back.href = "#/home";
+    back.href = options.backHref ?? "#/home";
     back.dataset.learningBack = "true";
     back.className = "learning-back";
     back.textContent = "返回首页";

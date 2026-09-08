@@ -1,4 +1,4 @@
-import type { LearnerProgressV1 } from "../domain/progress";
+import type { DailyStep, LearnerProgressV1 } from "../domain/progress";
 import type { LessonState, SupportLevel } from "../domain/lesson-engine";
 
 export interface SaveExerciseResultInput {
@@ -68,7 +68,11 @@ export interface ProgressRepository {
   saveCalibrationResult(input: SaveCalibrationResultInput): Promise<LearnerProgressV1>;
   savePhraseId(phraseId: string): Promise<LearnerProgressV1>;
   saveLookup(input: SaveLookupInput): Promise<LearnerProgressV1>;
-  ensureDailyPlan(date: string, missionIds: readonly [string, string, string]): Promise<LearnerProgressV1>;
+  ensureDailyPlan(
+    date: string,
+    missionIds: readonly [string, string, string],
+    steps?: readonly [DailyStep, DailyStep, DailyStep]
+  ): Promise<LearnerProgressV1>;
   advanceMissionIntroduction(input: AdvanceMissionIntroductionInput): Promise<LearnerProgressV1>;
   saveRecording(key: string, recording: Blob): Promise<void>;
   loadRecording(key: string): Promise<Blob | undefined>;

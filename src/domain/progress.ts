@@ -52,9 +52,22 @@ const lookupHistoryEntrySchema = z.object({
   savedAt: isoDateTime
 }).strict();
 
+const dailyStepSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("mission"),
+    missionId: z.string().min(1),
+    mode: z.enum(["introduction", "challenge"])
+  }).strict(),
+  z.object({
+    kind: z.literal("review"),
+    slot: z.enum(["morning", "midday", "evening"])
+  }).strict()
+]);
+
 const dailyPlanSchema = z.object({
   missionIds: z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)])
-    .refine((ids) => new Set(ids).size === ids.length, "daily plan missions must be unique")
+    .refine((ids) => new Set(ids).size === ids.length, "daily plan missions must be unique"),
+  steps: z.tuple([dailyStepSchema, dailyStepSchema, dailyStepSchema]).optional()
 }).strict();
 
 const missionIntroductionSchema = z.object({
@@ -101,6 +114,7 @@ export const learnerProgressV1Schema = z.object({
 
 export type LearnerProgressV1 = z.infer<typeof learnerProgressV1Schema>;
 export type MissionIntroductionProgress = z.infer<typeof missionIntroductionSchema>;
+export type DailyStep = z.infer<typeof dailyStepSchema>;
 
 export function createLearnerProgressV1(now = new Date()): LearnerProgressV1 {
   return {

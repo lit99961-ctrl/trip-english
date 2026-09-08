@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp, createAppShell } from "../../src/app/create-app";
 import { createLearnerProgressV1 } from "../../src/domain/progress";
+import { travelMissions } from "../../src/content/missions.travel";
 import type { ProgressRepository } from "../../src/storage/progress-repository";
 import type { SpeechPort } from "../../src/speech/speech-port";
 
@@ -67,8 +68,10 @@ describe("app shell", () => {
     app.dispose();
   });
 
-  it("opens the daily sprint, deep-links its lesson and browser back returns to the sprint", async () => {
-    const { repository, speech } = dependencies();
+  it("opens the daily sprint, gates its lesson behind learning and browser back returns to the sprint", async () => {
+    const progress = createLearnerProgressV1();
+    progress.activeMissionId = "hotel-checkin";
+    const { repository, speech } = dependencies(progress);
     window.location.hash = "#/home";
     const app = createApp({ repository, speech });
     document.body.append(app);
@@ -78,8 +81,9 @@ describe("app shell", () => {
     expect(window.location.hash).toBe("#/sprint");
     app.querySelector<HTMLButtonElement>("button.primary-action")!.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(window.location.hash).toBe("#/sprint/lesson/hk-checkin");
-    expect(app.querySelector(".lesson-view")).not.toBeNull();
+    expect(window.location.hash).toBe("#/sprint/learn/hotel-checkin");
+    expect(app.querySelector(".learning-view")).not.toBeNull();
+    expect(app.querySelector(".lesson-view")).toBeNull();
 
     window.history.back();
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -88,14 +92,30 @@ describe("app shell", () => {
     app.dispose();
   });
 
-  it("refreshes a lesson deep link and rejects unknown mission ids", async () => {
+  it("gates a refreshed lesson deep link, offers repeat entry, and rejects unknown mission ids", async () => {
     const { repository, speech } = dependencies();
-    window.location.hash = "#/lesson/venice-vaporetto";
+    window.location.hash = "#/lesson/hotel-checkin";
     const app = createApp({ repository, speech });
     document.body.append(app);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(app.querySelector(".lesson-view")).not.toBeNull();
+    expect(app.querySelector(".learning-view")).not.toBeNull();
     app.dispose();
+
+    const legacy = createLearnerProgressV1();
+    const hotel = travelMissions.find((mission) => mission.id === "hotel-checkin")!;
+    legacy.sessions["hotel-checkin"] = {
+      missionId: "hotel-checkin", completedExerciseIds: [hotel.exercises[0]!.id]
+    };
+    const legacyDependencies = dependencies(legacy);
+    window.location.hash = "#/lesson/hotel-checkin";
+    const returning = createApp(legacyDependencies);
+    document.body.replaceChildren(returning);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(returning.querySelector(".mission-entry-view")).not.toBeNull();
+    window.location.hash = "#/challenge/hotel-checkin";
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(returning.querySelector(".lesson-view")).not.toBeNull();
+    returning.dispose();
 
     window.location.hash = "#/lesson/not-a-real-mission";
     const invalid = createApp({ repository, speech });
@@ -104,5 +124,16 @@ describe("app shell", () => {
     expect(invalid.textContent).toContain("任务不存在");
     expect(invalid.querySelector(".lesson-view")).toBeNull();
     invalid.dispose();
+  });
+
+  it("keeps a sprint review deep link inside the sprint flow", async () => {
+    const { repository, speech } = dependencies();
+    window.location.hash = "#/sprint/review/morning";
+    const app = createApp({ repository, speech });
+    document.body.append(app);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(window.location.hash).toBe("#/sprint/review/morning");
+    expect(app.querySelector(".review-view")).not.toBeNull();
+    app.dispose();
   });
 });

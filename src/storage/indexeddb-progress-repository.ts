@@ -8,6 +8,7 @@ import {
 import {
   createLearnerProgressV1,
   migrateProgress,
+  type DailyStep,
   type LearnerProgressV1
 } from "../domain/progress";
 import { scheduleReview, type ReviewOutcome } from "../domain/review-scheduler";
@@ -303,15 +304,23 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
   public async ensureDailyPlan(
     date: string,
-    missionIds: readonly [string, string, string]
+    missionIds: readonly [string, string, string],
+    steps?: readonly [DailyStep, DailyStep, DailyStep]
   ): Promise<LearnerProgressV1> {
+    const candidatePlan = { missionIds: [...missionIds], ...(steps ? { steps: structuredClone(steps) } : {}) };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || new Set(missionIds).size !== 3 || missionIds.some((id) => !id.trim())) {
+      throw new Error("daily plan input is invalid");
+    }
+    try {
+      migrateProgress({ ...createLearnerProgressV1(this.now()), dailyPlans: { [date]: candidatePlan } }, this.now());
+    } catch {
       throw new Error("daily plan input is invalid");
     }
     const database = await this.getDatabase();
     const transaction = database.transaction("progress", "readwrite");
     const progress = projectReviewHistory(migrateProgress(await transaction.store.get(PROGRESS_KEY), this.now()));
-    if (progress.dailyPlans?.[date]) {
+    const existing = progress.dailyPlans?.[date];
+    if (existing?.steps || (existing && !steps)) {
       await transaction.done;
       return progress;
     }
@@ -320,7 +329,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       .slice(0, 30));
     const next = migrateProgress({
       ...progress,
-      dailyPlans: { ...retained, [date]: { missionIds: [...missionIds] } }
+      dailyPlans: { ...retained, [date]: existing
+        ? { ...existing, steps: structuredClone(steps!) }
+        : candidatePlan }
     }, this.now());
     await transaction.store.put(next, PROGRESS_KEY);
     await transaction.done;

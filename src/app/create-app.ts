@@ -4,6 +4,8 @@ import { renderCalibration } from "../features/calibration/calibration-view";
 import { lookupText, renderEmergency } from "../features/emergency/emergency-view";
 import { renderHome } from "../features/home/home-view";
 import { renderLesson } from "../features/lesson/lesson-view";
+import { renderLearning } from "../features/learning/learning-view";
+import { missionDestination, renderMissionEntry } from "../features/mission-entry/mission-entry-view";
 import { renderProgress } from "../features/progress/progress-view";
 import { renderSprint } from "../features/sprint/sprint-view";
 import { renderReview } from "../features/review/review-view";
@@ -94,7 +96,10 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
       } else if (route === "#/sprint") {
         view = await renderSprint({
           repository: dependencies.repository,
-          onStartMission: (missionId) => { window.location.hash = `#/sprint/lesson/${missionId}`; },
+          onStartMission: (missionId, mode) => {
+            window.location.hash = `#/sprint/${mode === "introduction" ? "learn" : "challenge"}/${missionId}`;
+          },
+          onStartReview: (slot) => { window.location.hash = `#/sprint/review/${slot}`; },
           onComplete: () => { window.location.hash = "#/home"; }
         });
       } else if (route === "#/emergency") {
@@ -117,13 +122,14 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
           }
           pendingLookup = "";
         }
-      } else if (route.startsWith("#/review/")) {
-        const slot = route.slice("#/review/".length);
+      } else if (route.startsWith("#/review/") || route.startsWith("#/sprint/review/")) {
+        const fromSprint = route.startsWith("#/sprint/review/");
+        const slot = route.slice(fromSprint ? "#/sprint/review/".length : "#/review/".length);
         if (!isDailyReviewSlot(slot)) throw new Error("invalid review slot");
         const progress = await dependencies.repository.load();
         view = renderReview({
           slot, progress, repository: dependencies.repository, speech: dependencies.speech,
-          onComplete: () => { window.location.hash = "#/home"; }
+          onComplete: () => { window.location.hash = fromSprint ? "#/sprint" : "#/home"; }
         });
       } else if (route === "#/progress") {
         view = await renderProgress({
@@ -132,8 +138,10 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
           ...(dependencies.requestPersistence ? { requestPersistence: dependencies.requestPersistence } : {})
         });
       } else {
-        const fromSprint = route.startsWith("#/sprint/lesson/");
-        const missionId = route.slice(fromSprint ? "#/sprint/lesson/".length : "#/lesson/".length);
+        const match = route.match(/^#\/(sprint\/)?(lesson|learn|challenge)\/(.+)$/);
+        const fromSprint = Boolean(match?.[1]);
+        const routeKind = match?.[2] as "lesson" | "learn" | "challenge" | undefined;
+        const missionId = match?.[3] ?? "";
         const mission = allMissions.find((candidate) => candidate.id === missionId);
         if (!mission) {
           const invalid = document.createElement("section");
@@ -146,13 +154,33 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
           view = invalid;
         } else {
           const progress = await dependencies.repository.load();
-          view = renderLesson({
-            mission,
-            progress,
-            speech: dependencies.speech,
-            persistence: dependencies.repository,
-            onComplete: () => { window.location.hash = fromSprint ? "#/sprint" : "#/home"; }
-          });
+          const prefix = fromSprint ? "#/sprint" : "";
+          const destination = routeKind === "learn"
+            ? "learning"
+            : missionDestination(progress, mission, routeKind === "challenge");
+          if (destination === "learning") {
+            const isReview = routeKind === "learn" && missionDestination(progress, mission, false) === "entry";
+            view = renderLearning({
+              mission, progress, repository: dependencies.repository, speech: dependencies.speech,
+              mode: isReview ? "review" : "introduction",
+              backHref: fromSprint ? "#/sprint" : "#/home",
+              onComplete: () => { window.location.hash = `${prefix}/challenge/${mission.id}`; }
+            });
+          } else if (destination === "entry") {
+            view = renderMissionEntry({
+              mission,
+              onReview: () => { window.location.hash = `${prefix}/learn/${mission.id}`; },
+              onChallenge: () => { window.location.hash = `${prefix}/challenge/${mission.id}`; }
+            });
+          } else {
+            view = renderLesson({
+              mission,
+              progress,
+              speech: dependencies.speech,
+              persistence: dependencies.repository,
+              onComplete: () => { window.location.hash = fromSprint ? "#/sprint" : "#/home"; }
+            });
+          }
         }
       }
       if (version !== renderVersion) {
