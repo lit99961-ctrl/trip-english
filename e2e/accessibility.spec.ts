@@ -58,3 +58,18 @@ test("supports reduced motion, Dynamic Type, and native English selection", asyn
   await expect(page.getByText(/离线内容已就绪|正在准备离线内容/)).toBeVisible();
   expect(testInfo.project.name).toMatch(/chromium/);
 });
+
+test("keeps the learning cards selectable and within a phone viewport", async ({ page }) => {
+  await page.goto("/#/lesson/hotel-checkin");
+  await expect(page.locator(".learning-view")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const english = page.locator(".learning-english");
+  await expect(english).toBeVisible();
+  expect(await english.evaluate((element) => getComputedStyle(element).userSelect)).toBe("text");
+  const buttons = page.locator(".learning-view button:visible");
+  const sizes = await buttons.evaluateAll((items) => items.map((item) => {
+    const box = item.getBoundingClientRect();
+    return { width: box.width, height: box.height };
+  }));
+  expect(sizes.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
+});

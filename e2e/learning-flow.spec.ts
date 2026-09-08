@@ -18,6 +18,20 @@ test("calibrates, completes a hotel mission, and resumes measured progress", asy
   await expect(page.getByText(/持久存储|定期备份/)).toBeVisible();
 
   await page.goto("/#/lesson/hotel-checkin");
+  await expect(page.locator(".learning-view")).toBeVisible();
+  await page.getByRole("button", { name: "学会这句，继续" }).click();
+  await expect(page.getByText("2 / 16", { exact: false })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("2 / 16", { exact: false })).toBeVisible();
+  for (let sentence = 2; sentence <= 16; sentence += 1) {
+    await page.getByRole("button", { name: "学会这句，继续" }).click();
+    if (sentence === 5 || sentence === 10 || sentence === 15) {
+      await page.getByRole("button", { name: "显示英文答案" }).click();
+      await page.getByRole("button", { name: "看过了，继续学习" }).click();
+    }
+  }
+  await expect(page.getByRole("heading", { name: /句子地图/ })).toBeVisible();
+  await page.getByRole("button", { name: "进入练习" }).click();
   await page.getByRole("button", { name: "显示答案" }).click();
   await page.getByLabel("需要再练", { exact: true }).check();
   await page.getByRole("button", { name: "确认", exact: true }).click();

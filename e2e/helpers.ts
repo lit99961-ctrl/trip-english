@@ -48,7 +48,24 @@ export async function completeCurrentSpeakingExercise(page: Page, rating = "说�
 
 export async function startHotelAndCompleteFirstExercise(page: Page): Promise<void> {
   await page.goto("/#/lesson/hotel-checkin");
+  await completeMissionIntroduction(page);
   await page.getByRole("button", { name: "显示答案" }).click();
   await page.getByLabel("想起来了", { exact: true }).check();
   await page.getByRole("button", { name: "确认", exact: true }).click();
+}
+
+export async function completeMissionIntroduction(page: Page): Promise<void> {
+  for (let sentence = 1; sentence <= 16; sentence += 1) {
+    await page.getByRole("button", { name: "学会这句，继续" }).click();
+    if (sentence === 5 || sentence === 10 || sentence === 15) {
+      await expectLearningScreen(page, "recap");
+      await page.getByRole("button", { name: "看过了，继续学习" }).click();
+    }
+  }
+  await expectLearningScreen(page, "phrase-map");
+  await page.getByRole("button", { name: "进入练习" }).click();
+}
+
+async function expectLearningScreen(page: Page, screen: "recap" | "phrase-map"): Promise<void> {
+  await page.locator(`.learning-view[data-screen="${screen}"]`).waitFor();
 }
