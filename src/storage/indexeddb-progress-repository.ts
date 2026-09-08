@@ -13,6 +13,7 @@ import {
 import { scheduleReview, type ReviewOutcome } from "../domain/review-scheduler";
 import type {
   LearningAttemptEvent,
+  AdvanceMissionIntroductionInput,
   ProgressRepository,
   RestoreFinalizeOutcome,
   RestoreRollbackOutcome,
@@ -320,6 +321,85 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     const next = migrateProgress({
       ...progress,
       dailyPlans: { ...retained, [date]: { missionIds: [...missionIds] } }
+    }, this.now());
+    await transaction.store.put(next, PROGRESS_KEY);
+    await transaction.done;
+    return next;
+  }
+
+  public async advanceMissionIntroduction(
+    input: AdvanceMissionIntroductionInput
+  ): Promise<LearnerProgressV1> {
+    const missionId = input.missionId.trim();
+    if (!missionId || missionId !== input.missionId) throw new Error("missionId must be trimmed and nonempty");
+    if (input.kind === "sentence") {
+      if (
+        !Number.isInteger(input.expectedIndex)
+        || input.expectedIndex < 0
+        || new Set(input.orderedSentenceIds).size !== input.orderedSentenceIds.length
+        || input.orderedSentenceIds.some((id) => !id.startsWith(`${missionId}-`))
+        || input.orderedSentenceIds[input.expectedIndex] !== input.sentenceId
+      ) throw new Error("sentence transition must reference the ordered sentence at expectedIndex");
+    }
+    if (input.kind === "complete") {
+      const timestamp = new Date(input.completedAt);
+      if (
+        Number.isNaN(timestamp.getTime())
+        || timestamp.toISOString() !== input.completedAt
+        || new Set(input.orderedSentenceIds).size !== input.orderedSentenceIds.length
+        || input.orderedSentenceIds.some((id) => !id.startsWith(`${missionId}-`))
+      ) throw new Error("introduction completion input is invalid");
+    }
+
+    const database = await this.getDatabase();
+    const transaction = database.transaction("progress", "readwrite");
+    const progress = projectReviewHistory(migrateProgress(await transaction.store.get(PROGRESS_KEY), this.now()));
+    const current = progress.missionIntroductions?.[missionId] ?? {
+      missionId,
+      nextSentenceIndex: 0,
+      viewedSentenceIds: [],
+      shadowedSentenceIds: [],
+      completedRecapIndexes: []
+    };
+    let introduction = current;
+
+    if (input.kind === "sentence") {
+      if (current.nextSentenceIndex === input.expectedIndex + 1
+        && current.viewedSentenceIds[input.expectedIndex] === input.sentenceId) {
+        introduction = input.shadowed && !current.shadowedSentenceIds.includes(input.sentenceId)
+          ? { ...current, shadowedSentenceIds: [...current.shadowedSentenceIds, input.sentenceId] }
+          : current;
+      } else {
+        if (current.nextSentenceIndex !== input.expectedIndex) throw new Error("stale introduction cursor");
+        introduction = {
+          ...current,
+          nextSentenceIndex: input.expectedIndex + 1,
+          viewedSentenceIds: [...current.viewedSentenceIds, input.sentenceId],
+          shadowedSentenceIds: input.shadowed
+            ? [...current.shadowedSentenceIds, input.sentenceId]
+            : current.shadowedSentenceIds
+        };
+      }
+    } else if (input.kind === "recap") {
+      if (current.nextSentenceIndex < input.atIndex) throw new Error("recap cannot precede its sentence checkpoint");
+      introduction = current.completedRecapIndexes.includes(input.atIndex)
+        ? current
+        : { ...current, completedRecapIndexes: [...current.completedRecapIndexes, input.atIndex] };
+    } else {
+      if (
+        current.nextSentenceIndex !== input.orderedSentenceIds.length
+        || current.viewedSentenceIds.length !== input.orderedSentenceIds.length
+        || current.viewedSentenceIds.some((id, index) => id !== input.orderedSentenceIds[index])
+      ) throw new Error("all authored sentences must be viewed before completion");
+      introduction = current.completedAt ? current : { ...current, completedAt: input.completedAt };
+    }
+
+    const next = migrateProgress({
+      ...progress,
+      missionIntroductions: {
+        ...(progress.missionIntroductions ?? {}),
+        [missionId]: introduction
+      }
     }, this.now());
     await transaction.store.put(next, PROGRESS_KEY);
     await transaction.done;

@@ -16,6 +16,7 @@ function dependencies(progress = createLearnerProgressV1()) {
       progress.dailyPlans = { ...(progress.dailyPlans ?? {}), [date]: { missionIds: [...missionIds] } };
       return progress;
     }),
+    advanceMissionIntroduction: vi.fn(async () => progress),
     saveRecording: vi.fn(), loadRecording: vi.fn(), beginRestore: vi.fn(), rollbackRestore: vi.fn(),
     finalizeRestore: vi.fn(), reset: vi.fn(), close: vi.fn()
   };

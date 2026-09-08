@@ -966,4 +966,42 @@ describe("IndexedDbProgressRepository", () => {
     expect(first.dailyPlans?.["2026-09-05"]?.missionIds).toEqual(["hotel", "train", "restaurant"]);
     expect(second.dailyPlans?.["2026-09-05"]?.missionIds).toEqual(["hotel", "train", "restaurant"]);
   });
+
+  test("advances mission introductions atomically and idempotently", async () => {
+    const repository = createRepository();
+    const orderedSentenceIds = ["hotel-learn-one", "hotel-learn-two"];
+    const transition = {
+      kind: "sentence" as const, missionId: "hotel", orderedSentenceIds,
+      expectedIndex: 0, sentenceId: orderedSentenceIds[0]!, shadowed: true
+    };
+    const first = await repository.advanceMissionIntroduction(transition);
+    const retried = await repository.advanceMissionIntroduction(transition);
+    expect(first.missionIntroductions?.hotel).toEqual(retried.missionIntroductions?.hotel);
+    expect(retried.missionIntroductions?.hotel).toMatchObject({
+      nextSentenceIndex: 1, viewedSentenceIds: ["hotel-learn-one"],
+      shadowedSentenceIds: ["hotel-learn-one"]
+    });
+    await expect(repository.advanceMissionIntroduction({
+      ...transition, expectedIndex: 1, sentenceId: "hotel-learn-skipped"
+    })).rejects.toThrow(/ordered sentence/i);
+  });
+
+  test("acknowledges recaps and completes only after every authored sentence", async () => {
+    const repository = createRepository();
+    const orderedSentenceIds = Array.from({ length: 5 }, (_, index) => `hotel-learn-${index}`);
+    for (const [index, sentenceId] of orderedSentenceIds.entries()) {
+      await repository.advanceMissionIntroduction({
+        kind: "sentence", missionId: "hotel", orderedSentenceIds,
+        expectedIndex: index, sentenceId, shadowed: false
+      });
+    }
+    await repository.advanceMissionIntroduction({ kind: "recap", missionId: "hotel", atIndex: 5 });
+    const completedAt = "2026-09-08T08:00:00.000Z";
+    const completed = await repository.advanceMissionIntroduction({
+      kind: "complete", missionId: "hotel", orderedSentenceIds, completedAt
+    });
+    expect(completed.missionIntroductions?.hotel).toMatchObject({
+      nextSentenceIndex: 5, completedRecapIndexes: [5], completedAt
+    });
+  });
 });

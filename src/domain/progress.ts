@@ -57,6 +57,29 @@ const dailyPlanSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length, "daily plan missions must be unique")
 }).strict();
 
+const missionIntroductionSchema = z.object({
+  missionId: z.string().min(1),
+  nextSentenceIndex: z.number().int().nonnegative(),
+  viewedSentenceIds: z.array(z.string().min(1)),
+  shadowedSentenceIds: z.array(z.string().min(1)),
+  completedRecapIndexes: z.array(z.union([z.literal(5), z.literal(10), z.literal(15)])),
+  completedAt: isoDateTime.optional()
+}).strict().superRefine((value, context) => {
+  if (new Set(value.viewedSentenceIds).size !== value.viewedSentenceIds.length) {
+    context.addIssue({ code: "custom", message: "viewedSentenceIds must be unique", path: ["viewedSentenceIds"] });
+  }
+  if (new Set(value.shadowedSentenceIds).size !== value.shadowedSentenceIds.length) {
+    context.addIssue({ code: "custom", message: "shadowedSentenceIds must be unique", path: ["shadowedSentenceIds"] });
+  }
+  if (new Set(value.completedRecapIndexes).size !== value.completedRecapIndexes.length) {
+    context.addIssue({ code: "custom", message: "completedRecapIndexes must be unique", path: ["completedRecapIndexes"] });
+  }
+  const viewed = new Set(value.viewedSentenceIds);
+  if (value.shadowedSentenceIds.some((id) => !viewed.has(id))) {
+    context.addIssue({ code: "custom", message: "shadowed sentences must also be viewed", path: ["shadowedSentenceIds"] });
+  }
+});
+
 export const learnerProgressV1Schema = z.object({
   schemaVersion: z.literal(1),
   startedAt: isoDateTime,
@@ -67,6 +90,7 @@ export const learnerProgressV1Schema = z.object({
   knownWords: z.array(z.string().regex(/^[a-z]+(?:'[a-z]+)?$/)).optional(),
   lookupHistory: z.array(lookupHistoryEntrySchema).max(50).optional(),
   dailyPlans: z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), dailyPlanSchema).optional(),
+  missionIntroductions: z.record(z.string(), missionIntroductionSchema).optional(),
   speakingSeconds: z.number().nonnegative(),
   hintCount: z.number().int().nonnegative(),
   promptFreeScenarioIds: z.array(z.string()),
@@ -76,6 +100,7 @@ export const learnerProgressV1Schema = z.object({
 }).strict();
 
 export type LearnerProgressV1 = z.infer<typeof learnerProgressV1Schema>;
+export type MissionIntroductionProgress = z.infer<typeof missionIntroductionSchema>;
 
 export function createLearnerProgressV1(now = new Date()): LearnerProgressV1 {
   return {
