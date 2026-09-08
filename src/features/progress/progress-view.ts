@@ -45,6 +45,28 @@ function recallCount(progress: LearnerProgressV1): number {
   return recalled.size;
 }
 
+function evidenceCounts(progress: LearnerProgressV1): {
+  viewed: number; shadowed: number; recognized: number; taskReady: number;
+} {
+  const viewed = new Set(Object.values(progress.missionIntroductions ?? {})
+    .flatMap((introduction) => introduction.viewedSentenceIds));
+  const shadowed = new Set(Object.values(progress.missionIntroductions ?? {})
+    .flatMap((introduction) => introduction.shadowedSentenceIds));
+  const recognized = new Set<string>();
+  Object.values(progress.sessions).forEach((session) => {
+    Object.entries(session.phraseAttempts ?? {}).forEach(([phraseId, attempts]) => {
+      if (attempts.some((attempt) => attempt.activity === "choice" && attempt.passed && !attempt.answerRevealed)) {
+        recognized.add(phraseId);
+      }
+    });
+  });
+  const authoredRoleplays = new Set(allMissions.flatMap((mission) =>
+    mission.exercises.filter((exercise) => exercise.type === "roleplay").map((exercise) => exercise.id)
+  ));
+  const taskReady = new Set(progress.promptFreeScenarioIds.filter((id) => authoredRoleplays.has(id))).size;
+  return { viewed: viewed.size, shadowed: shadowed.size, recognized: recognized.size, taskReady };
+}
+
 function hintTrend(progress: LearnerProgressV1): string {
   const attempts = Object.values(progress.sessions).flatMap((session) =>
     Object.values(session.phraseAttempts ?? {}).flat()
@@ -106,6 +128,7 @@ export async function renderProgress(options: ProgressViewOptions): Promise<Prog
     return root;
   }
   const persistence = await (options.requestPersistence ?? requestPersistentStorage)().catch(() => "best-effort" as const);
+  const evidence = evidenceCounts(progress);
 
   const heading = document.createElement("h1");
   heading.textContent = "冲刺进度";
@@ -122,8 +145,10 @@ export async function renderProgress(options: ProgressViewOptions): Promise<Prog
   };
   metrics.append(
     metric("开口时间", `${Math.floor(progress.speakingSeconds / 60)} / 120 分钟`),
+    metric("学习卡", `已学句子 ${evidence.viewed} · 跟读 ${evidence.shadowed}`),
+    metric("听力", `听懂练习 ${evidence.recognized}`),
     metric("主动回忆", `${recallCount(progress)} / ${ACTIVE_TARGET_COUNT}`),
-    metric("独立完成", `无提示场景 ${new Set(progress.promptFreeScenarioIds).size}`),
+    metric("任务就绪", `办成场景 ${evidence.taskReady}`),
     metric("提示趋势", hintTrend(progress))
   );
   const collection = document.createElement("p");

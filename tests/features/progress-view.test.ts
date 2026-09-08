@@ -35,7 +35,9 @@ describe("measured progress", () => {
   it("reports sprint measures from persisted evidence", async () => {
     const progress = createLearnerProgressV1();
     progress.speakingSeconds = 3_660;
-    progress.promptFreeScenarioIds = ["hotel-roleplay", "train-roleplay"];
+    const taskReady = allMissions.flatMap((mission) => mission.exercises)
+      .filter((exercise) => exercise.type === "roleplay").slice(0, 2);
+    progress.promptFreeScenarioIds = taskReady.map((exercise) => exercise.id);
     progress.hintCount = 4;
     progress.savedPhraseIds = ["em-help-112"];
     progress.knownWords = ["train", "ticket"];
@@ -49,6 +51,12 @@ describe("measured progress", () => {
         [targets[2]!.id]: "practiced"
       }
     };
+    const learnedMission = allMissions.find((mission) => mission.learningSentences?.length)!;
+    progress.missionIntroductions = { [learnedMission.id]: {
+      missionId: learnedMission.id, nextSentenceIndex: 2,
+      viewedSentenceIds: learnedMission.learningSentences!.slice(0, 2).map((sentence) => sentence.id),
+      shadowedSentenceIds: [learnedMission.learningSentences![0]!.id], completedRecapIndexes: []
+    } };
     const view = await renderProgress({
       repository: repository(progress), speech: speech(),
       requestPersistence: async () => "granted"
@@ -56,7 +64,10 @@ describe("measured progress", () => {
 
     expect(view.textContent).toContain("61 / 120 分钟");
     expect(view.textContent).toContain("2 / 33");
-    expect(view.textContent).toContain("无提示场景 2");
+    expect(view.textContent).toContain("已学句子 2");
+    expect(view.textContent).toContain("跟读 1");
+    expect(view.textContent).toContain("听懂练习");
+    expect(view.textContent).toContain("办成场景 2");
     expect(view.textContent).toContain("已授权持久存储");
     expect(view.textContent).toContain("提示趋势");
     expect(view.textContent).toContain("句卡 1 · 单词 2");

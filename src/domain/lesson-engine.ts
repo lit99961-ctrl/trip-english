@@ -36,6 +36,29 @@ export interface LessonState {
   phraseClasses: Record<string, AttemptClass>;
 }
 
+export type LearningEvidenceLevel = "unseen" | "viewed" | "shadowed" | "recognized" | "recalled" | "task-ready";
+
+export interface LearningEvidenceInput {
+  viewed: boolean;
+  shadowed: boolean;
+  attempts: readonly Attempt[];
+  promptFreeRoleplay: boolean;
+}
+
+/** Derives the strongest defensible learning claim from immutable evidence. */
+export function deriveEvidenceLevel(input: LearningEvidenceInput): LearningEvidenceLevel {
+  const recognized = input.attempts.some((attempt) =>
+    attempt.activity === "choice" && attempt.passed && !attempt.answerRevealed
+  );
+  const recalled = input.attempts.some(isPromptFreePass);
+  if (input.promptFreeRoleplay && recalled) return "task-ready";
+  if (recalled) return "recalled";
+  if (recognized) return "recognized";
+  if (input.shadowed) return "shadowed";
+  if (input.viewed) return "viewed";
+  return "unseen";
+}
+
 function assertHintCount(hintCount: number | undefined): void {
   if (hintCount !== undefined && (!Number.isInteger(hintCount) || hintCount < 0)) {
     throw new Error("hintCount must be a non-negative integer");

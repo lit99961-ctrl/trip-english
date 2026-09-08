@@ -146,6 +146,17 @@ export async function renderHome(options: HomeViewOptions): Promise<HTMLElement>
   const review = document.createElement("p");
   review.className = "metric-chip";
   review.textContent = `待复习 ${dueCount} · 收藏 ${progress.savedPhraseIds.length}`;
+  const learnedCount = new Set(Object.values(progress.missionIntroductions ?? {})
+    .flatMap((introduction) => introduction.viewedSentenceIds)).size;
+  const shadowedCount = new Set(Object.values(progress.missionIntroductions ?? {})
+    .flatMap((introduction) => introduction.shadowedSentenceIds)).size;
+  const roleplayIds = new Set(travelMissions.flatMap((travelMission) =>
+    travelMission.exercises.filter((exercise) => exercise.type === "roleplay").map((exercise) => exercise.id)
+  ));
+  const taskReadyCount = new Set(progress.promptFreeScenarioIds.filter((id) => roleplayIds.has(id))).size;
+  const learningEvidence = document.createElement("p");
+  learningEvidence.className = "metric-chip";
+  learningEvidence.textContent = `已学 ${learnedCount} · 跟读 ${shadowedCount} · 办成 ${taskReadyCount}`;
   const start = document.createElement("button");
   start.type = "button";
   start.className = "primary-action";
@@ -189,6 +200,6 @@ export async function renderHome(options: HomeViewOptions): Promise<HTMLElement>
     card.append(title, button);
     reviews.append(card);
   });
-  root.append(eyebrow, heading, daily, start, reviews, route, review);
+  root.append(eyebrow, heading, daily, start, reviews, route, learningEvidence, review);
   return root;
 }

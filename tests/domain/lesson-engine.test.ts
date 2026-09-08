@@ -4,6 +4,7 @@ import {
   classifyAttempt,
   completeExercise,
   createLessonState,
+  deriveEvidenceLevel,
   nextExercise,
   recordPhraseAttempt,
   type Attempt,
@@ -14,6 +15,32 @@ const promptFreePass = (): Attempt => ({
   supportLevel: "prompt-only",
   passed: true,
   answerRevealed: false
+});
+
+describe("travel learning evidence", () => {
+  it("does not turn viewing or shadowing into recall", () => {
+    expect(deriveEvidenceLevel({ viewed: true, shadowed: false, attempts: [], promptFreeRoleplay: false }))
+      .toBe("viewed");
+    expect(deriveEvidenceLevel({ viewed: true, shadowed: true, attempts: [], promptFreeRoleplay: false }))
+      .toBe("shadowed");
+  });
+
+  it("requires successful evidence for listening, recall and task readiness", () => {
+    const choice: Attempt = {
+      supportLevel: "full", passed: true, answerRevealed: false, activity: "choice"
+    };
+    const recall = promptFreePass();
+    expect(deriveEvidenceLevel({ viewed: false, shadowed: false, attempts: [choice], promptFreeRoleplay: false }))
+      .toBe("recognized");
+    expect(deriveEvidenceLevel({ viewed: false, shadowed: false, attempts: [recall], promptFreeRoleplay: false }))
+      .toBe("recalled");
+    expect(deriveEvidenceLevel({ viewed: false, shadowed: false, attempts: [recall], promptFreeRoleplay: true }))
+      .toBe("task-ready");
+    expect(deriveEvidenceLevel({
+      viewed: true, shadowed: true,
+      attempts: [{ ...recall, passed: false }], promptFreeRoleplay: true
+    })).toBe("shadowed");
+  });
 });
 
 describe("mastery classification", () => {

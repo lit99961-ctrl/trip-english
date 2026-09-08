@@ -42,6 +42,11 @@ describe("travel journal home", () => {
         "hotel-checkin-name": "practiced"
       }
     };
+    progress.missionIntroductions = { "hotel-checkin": {
+      missionId: "hotel-checkin", nextSentenceIndex: 2,
+      viewedSentenceIds: ["hotel-checkin-learn-reservation", "hotel-checkin-learn-name"],
+      shadowedSentenceIds: ["hotel-checkin-learn-reservation"], completedRecapIndexes: []
+    } };
     const view = await renderHome({
       repository: { load: async () => progress },
       now: () => new Date("2026-09-05T12:00:00Z")
@@ -49,6 +54,7 @@ describe("travel journal home", () => {
 
     expect(view.textContent).toContain("待复习 1");
     expect(view.textContent).toContain("收藏 2");
+    expect(view.textContent).toContain("已学 2 · 跟读 1 · 办成 0");
     expect(view.querySelector('[data-mastery="mastered"]')).toBeNull();
     expect(view.querySelector('[data-mastery="practiced"]')?.textContent).toBe("练习中 2/15");
     expect(view.textContent).not.toContain("100%");
