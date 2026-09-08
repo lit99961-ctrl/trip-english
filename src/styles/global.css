@@ -219,8 +219,72 @@ textarea {
 .review-view select,
 .review-view button,
 .lesson-view button,
-.sprint-view button {
+.sprint-view button,
+.learning-view button,
+.learning-back {
   min-height: 44px;
+}
+
+.learning-view {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+.learning-back {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  color: var(--accent);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.learning-meaning {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.learning-english {
+  margin: 0;
+  font-size: clamp(1.65rem, 8vw, 2.25rem);
+  font-weight: 850;
+  line-height: 1.18;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.learning-chunks,
+.learning-audio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.learning-chunks button {
+  min-width: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.learning-audio-actions > * {
+  flex: 1 1 132px;
+}
+
+.learning-view > section,
+.learning-view > ul {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.learning-view li {
+  margin-block: 10px;
+  line-height: 1.45;
 }
 
 @media (max-width: 430px) {
