@@ -251,6 +251,34 @@ describe("itinerary course coverage", () => {
     }
   });
 
+  it("teaches complete phrase packs before practice in seven priority scenes", () => {
+    const priorityIds = [
+      "hotel-checkin", "restaurant", "directions-tickets", "italy-high-speed-rail",
+      "swiss-mountain-transit", "supermarket-groceries", "urgent-help"
+    ];
+    const recoveryFrames = [
+      "Could you speak more slowly?", "Could you say that again?", "Could you show me?",
+      "Do you mean this one?", "I don't understand, but I need help."
+    ];
+    const allEnglish: string[] = [];
+    for (const missionId of priorityIds) {
+      const mission = travelMissions.find((candidate) => candidate.id === missionId)!;
+      const sentences = mission.learningSentences ?? [];
+      const production = sentences.filter((sentence) => sentence.role === "production");
+      const reception = sentences.filter((sentence) => sentence.role === "reception");
+      expect(sentences.length, missionId).toBeGreaterThanOrEqual(16);
+      expect(sentences.length, missionId).toBeLessThanOrEqual(20);
+      expect(production.length, `${missionId} production`).toBeGreaterThanOrEqual(6);
+      expect(production.length, `${missionId} production`).toBeLessThanOrEqual(8);
+      expect(reception.length, `${missionId} reception`).toBeGreaterThanOrEqual(8);
+      expect(reception.length, `${missionId} reception`).toBeLessThanOrEqual(12);
+      expect(new Set(sentences.map((sentence) => sentence.id)).size).toBe(sentences.length);
+      expect(sentences.some((sentence) => /slowly|again|show me|understand|do you mean/i.test(sentence.english)), missionId).toBe(true);
+      allEnglish.push(...sentences.map((sentence) => sentence.english));
+    }
+    for (const frame of recoveryFrames) expect(allEnglish).toContain(frame);
+  });
+
   it("covers the complete supermarket transaction", () => {
     const mission = travelMissions.find((item) => item.id === "supermarket-groceries")!;
     const text = [

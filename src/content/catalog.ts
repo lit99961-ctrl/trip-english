@@ -37,6 +37,10 @@ export function validateCatalog(candidate: unknown = missionSource): DeepReadonl
     missions.flatMap((mission) => mission.listeningScenarios?.map((scenario) => scenario.id) ?? []),
     "listening scenario"
   );
+  assertUnique(
+    missions.flatMap((mission) => mission.learningSentences?.map((sentence) => sentence.id) ?? []),
+    "learning sentence"
+  );
 
   for (const mission of missions) {
     for (const scenario of mission.listeningScenarios ?? []) {
@@ -45,6 +49,14 @@ export function validateCatalog(candidate: unknown = missionSource): DeepReadonl
       }
     }
     const phrasesById = new Map(mission.productionPhrases.map((phrase) => [phrase.id, phrase]));
+    for (const sentence of mission.learningSentences ?? []) {
+      if (!sentence.id.startsWith(`${mission.id}-`)) {
+        throw new Error(`learning sentence ${sentence.id} must be namespaced by ${mission.id}`);
+      }
+      if (sentence.phraseId !== undefined && !phrasesById.has(sentence.phraseId)) {
+        throw new Error(`learning sentence ${sentence.id} references missing phraseId: ${sentence.phraseId}`);
+      }
+    }
 
     for (const exercise of mission.exercises) {
       if (exercise.phraseId !== undefined && !phrasesById.has(exercise.phraseId)) {

@@ -17,6 +17,17 @@ export const listeningScenarioSchema = z.object({
   }
 });
 
+export const learningSentenceSchema = z.object({
+  id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  role: z.enum(["production", "reception"]),
+  english: trimmedNonemptyString,
+  chinese: trimmedNonemptyString,
+  usageZh: trimmedNonemptyString,
+  keywords: z.array(trimmedNonemptyString).min(1).max(4),
+  chunks: z.array(trimmedNonemptyString).min(1).max(4),
+  phraseId: z.string().min(1).optional()
+}).strict();
+
 export const phraseSchema = z.object({
   id: z.string().min(1),
   english: z.string().min(1),
@@ -57,7 +68,8 @@ const missionFields = {
   city: z.string().min(1),
   productionPhrases: z.array(phraseSchema).min(5).max(8),
   recognitionWords: z.array(z.string()).min(1),
-  listeningScenarios: z.array(listeningScenarioSchema).min(3).optional()
+  listeningScenarios: z.array(listeningScenarioSchema).min(3).optional(),
+  learningSentences: z.array(learningSentenceSchema).min(1).optional()
 };
 
 export const missionSchema = z
@@ -77,4 +89,5 @@ export const missionSchema = z
 
 export type Phrase = z.infer<typeof phraseSchema>;
 export type ListeningScenario = z.infer<typeof listeningScenarioSchema>;
+export type LearningSentence = z.infer<typeof learningSentenceSchema>;
 export type Mission = z.infer<typeof missionSchema>;

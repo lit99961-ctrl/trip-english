@@ -2,6 +2,7 @@ import { z } from "zod";
 import { missionSchema, type Mission } from "../domain/content-schema";
 import { deepFreeze, type DeepReadonly } from "./content-validation";
 import { listeningScenariosByMission } from "./listening-scenarios";
+import { learningSentencesByMission } from "./mission-learning";
 
 type PhraseDraft = readonly [string, string, string, string, readonly string[], readonly (readonly string[])[], boolean?];
 
@@ -18,6 +19,7 @@ function travelMission(
   phrases: readonly PhraseDraft[]
 ): Mission {
   const listeningScenarios = listeningScenariosByMission[id as keyof typeof listeningScenariosByMission];
+  const learningSentences = learningSentencesByMission[id as keyof typeof learningSentencesByMission];
   return {
     id,
     kind: "travel",
@@ -29,6 +31,13 @@ function travelMission(
         ...scenario,
         distractorsZh: [...scenario.distractorsZh] as [string, string],
         keywords: [...scenario.keywords]
+      }))
+    }),
+    ...(learningSentences === undefined ? {} : {
+      learningSentences: learningSentences.map((sentence) => ({
+        ...sentence,
+        keywords: [...sentence.keywords],
+        chunks: [...sentence.chunks]
       }))
     }),
     productionPhrases: phrases.map(([suffix, english, chinese, intent, keywords, requiredKeywordGroups, recovery]) => ({

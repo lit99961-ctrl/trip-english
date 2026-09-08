@@ -43,6 +43,7 @@ function displayedEnglishWords(): string[] {
     displayedText.push(mission.city, ...mission.recognitionWords);
     displayedText.push(...mission.productionPhrases.map((phrase) => phrase.english));
     displayedText.push(...(mission.listeningScenarios?.map((scenario) => scenario.transcript) ?? []));
+    displayedText.push(...(mission.learningSentences?.flatMap((sentence) => [sentence.english, ...sentence.chunks]) ?? []));
     for (const exercise of mission.exercises) {
       if (exercise.type === "reading") {
         displayedText.push(exercise.readingText);
@@ -122,6 +123,7 @@ describe("generated offline dictionary", () => {
       termini: "罗马特米尼火车站",
       vatican: "梵蒂冈（梵蒂冈博物馆）",
       venice: "威尼斯（意大利城市）",
+      visp: "菲斯普（瑞士城镇）",
       zermatt: "采尔马特（瑞士城镇）",
       zurich: "苏黎世（瑞士城市）"
     } as const;

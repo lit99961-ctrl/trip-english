@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { missionSchema, phraseSchema } from "../../src/domain/content-schema";
+import { learningSentenceSchema, missionSchema, phraseSchema } from "../../src/domain/content-schema";
 
 describe("missionSchema", () => {
+  it("validates practical learning sentences", () => {
+    const sentence = {
+      id: "hotel-checkin-i-have-reservation", role: "production",
+      english: "I have a reservation.", chinese: "我有预订。",
+      usageZh: "到前台后先说明已经预订。", keywords: ["reservation"],
+      chunks: ["I have", "a reservation"], phraseId: "hotel-checkin-reservation"
+    };
+    expect(learningSentenceSchema.parse(sentence)).toEqual(sentence);
+    expect(learningSentenceSchema.safeParse({ ...sentence, chunks: [] }).success).toBe(false);
+    expect(learningSentenceSchema.safeParse({ ...sentence, role: "quiz" }).success).toBe(false);
+    expect(learningSentenceSchema.safeParse({ ...sentence, keywords: ["a", "b", "c", "d", "e"] }).success).toBe(false);
+  });
+
   it("accepts only well-formed listening scenarios", () => {
     const phrase = {
       id: "listen-phrase", english: "Please help.", chinese: "请帮忙。", intent: "help",
