@@ -78,21 +78,12 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
     try {
       let view: HTMLElement & { dispose?: () => void | Promise<void> };
       if (route === "#/home") {
-        const progress = await dependencies.repository.load();
-        if (!progress.calibration) {
-          view = renderCalibration({
-            speech: dependencies.speech,
-            store: dependencies.repository,
-            onComplete: () => { void renderRoute("#/home"); }
-          });
-        } else {
-          view = await renderHome({
-            repository: dependencies.repository,
-            onStartMission: (missionId) => { window.location.hash = `#/lesson/${missionId}`; },
-            onStartSprint: () => { window.location.hash = "#/sprint"; },
-            onStartReview: (slot) => { window.location.hash = `#/review/${slot}`; }
-          });
-        }
+        view = await renderHome({
+          repository: dependencies.repository,
+          onStartMission: (missionId) => { window.location.hash = `#/lesson/${missionId}`; },
+          onStartSprint: () => { window.location.hash = "#/sprint"; },
+          onStartReview: (slot) => { window.location.hash = `#/review/${slot}`; }
+        });
       } else if (route === "#/sprint") {
         view = await renderSprint({
           repository: dependencies.repository,
@@ -173,13 +164,19 @@ export function createApp(dependencies: AppDependencies): TravelEnglishApp {
               onChallenge: () => { window.location.hash = `${prefix}/challenge/${mission.id}`; }
             });
           } else {
-            view = renderLesson({
-              mission,
-              progress,
-              speech: dependencies.speech,
-              persistence: dependencies.repository,
-              onComplete: () => { window.location.hash = fromSprint ? "#/sprint" : "#/home"; }
-            });
+            view = progress.calibration
+              ? renderLesson({
+                  mission,
+                  progress,
+                  speech: dependencies.speech,
+                  persistence: dependencies.repository,
+                  onComplete: () => { window.location.hash = fromSprint ? "#/sprint" : "#/home"; }
+                })
+              : renderCalibration({
+                  speech: dependencies.speech,
+                  store: dependencies.repository,
+                  onComplete: () => { void renderRoute(route); }
+                });
           }
         }
       }

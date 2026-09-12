@@ -49,6 +49,7 @@ export async function completeCurrentSpeakingExercise(page: Page, rating = "说�
 export async function startHotelAndCompleteFirstExercise(page: Page): Promise<void> {
   await page.goto("/#/lesson/hotel-checkin");
   await completeMissionIntroduction(page);
+  await completeCalibration(page);
   await page.getByRole("button", { name: "显示答案" }).click();
   await page.getByLabel("想起来了", { exact: true }).check();
   await page.getByRole("button", { name: "确认", exact: true }).click();

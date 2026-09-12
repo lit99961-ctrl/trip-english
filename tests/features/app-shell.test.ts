@@ -5,11 +5,13 @@ import { travelMissions } from "../../src/content/missions.travel";
 import type { ProgressRepository } from "../../src/storage/progress-repository";
 import type { SpeechPort } from "../../src/speech/speech-port";
 
-function dependencies(progress = createLearnerProgressV1()) {
-  progress.calibration ??= {
-    supportLevel: "full", correctItems: 0, speakingSeconds: 0,
-    completedAt: "2026-09-05T00:00:00.000Z", recordingKeys: []
-  };
+function dependencies(progress = createLearnerProgressV1(), calibrated = true) {
+  if (calibrated) {
+    progress.calibration ??= {
+      supportLevel: "full", correctItems: 0, speakingSeconds: 0,
+      completedAt: "2026-09-05T00:00:00.000Z", recordingKeys: []
+    };
+  }
   const repository: ProgressRepository = {
     load: vi.fn(async () => progress), saveExerciseResult: vi.fn(), saveCalibrationResult: vi.fn(),
     savePhraseId: vi.fn(async () => progress), saveLookup: vi.fn(async () => progress),
@@ -65,6 +67,46 @@ describe("app shell", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(app.querySelector("h1")?.textContent).toBe("救命句卡");
     expect(document.activeElement).toBe(app.querySelector("h1"));
+    app.dispose();
+  });
+
+  it("lets a brand-new learner study before the two-minute calibration", async () => {
+    const progress = createLearnerProgressV1();
+    const { repository, speech } = dependencies(progress, false);
+    window.location.hash = "#/home";
+    const app = createApp({ repository, speech });
+    document.body.append(app);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(app.querySelector(".home-view")).not.toBeNull();
+    expect(app.textContent).not.toContain("2 分钟起点小游戏");
+
+    window.location.hash = "#/lesson/hotel-checkin";
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(app.querySelector(".learning-view")).not.toBeNull();
+    expect(app.querySelector(".calibration-view")).toBeNull();
+    app.dispose();
+  });
+
+  it("asks for calibration only when an uncalibrated learner starts a formal challenge", async () => {
+    const progress = createLearnerProgressV1();
+    const hotel = travelMissions.find((mission) => mission.id === "hotel-checkin")!;
+    progress.missionIntroductions = { [hotel.id]: {
+      missionId: hotel.id,
+      nextSentenceIndex: hotel.learningSentences!.length,
+      viewedSentenceIds: hotel.learningSentences!.map((sentence) => sentence.id),
+      shadowedSentenceIds: [],
+      completedRecapIndexes: [5, 10, 15],
+      completedAt: "2026-09-12T08:00:00.000Z"
+    } };
+    const { repository, speech } = dependencies(progress, false);
+    window.location.hash = "#/challenge/hotel-checkin";
+    const app = createApp({ repository, speech });
+    document.body.append(app);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(app.querySelector(".calibration-view")).not.toBeNull();
+    expect(app.querySelector(".lesson-view")).toBeNull();
     app.dispose();
   });
 

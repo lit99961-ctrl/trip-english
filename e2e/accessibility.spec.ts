@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { completeCalibration, installFakeMicrophone } from "./helpers";
+import { installFakeMicrophone } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await installFakeMicrophone(page);
@@ -32,7 +32,6 @@ test("keeps navigation, headings, focus, and touch controls accessible", async (
 test("supports reduced motion, Dynamic Type, and native English selection", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await completeCalibration(page);
   await page.getByRole("link", { name: "急救箱" }).click();
 
   const reducedDuration = await page.locator(".app-shell").evaluate((element) => {

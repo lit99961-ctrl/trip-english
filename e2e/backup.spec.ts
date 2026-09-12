@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { completeCalibration, installFakeMicrophone, startHotelAndCompleteFirstExercise } from "./helpers";
+import { installFakeMicrophone, startHotelAndCompleteFirstExercise } from "./helpers";
 
 test("downloads progress and restores it into a fresh browser context", async ({ browser, page }) => {
   await installFakeMicrophone(page);
   await page.goto("/");
-  await completeCalibration(page);
   await startHotelAndCompleteFirstExercise(page);
   await page.getByRole("link", { name: "进度" }).click();
   const downloadPromise = page.waitForEvent("download");
@@ -30,7 +29,6 @@ test("downloads progress and restores it into a fresh browser context", async ({
 test("rejects invalid JSON without replacing current progress", async ({ page }) => {
   await installFakeMicrophone(page);
   await page.goto("/");
-  await completeCalibration(page);
   await startHotelAndCompleteFirstExercise(page);
   await page.getByRole("link", { name: "进度" }).click();
   await page.locator('input[type="file"]').setInputFiles({

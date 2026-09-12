@@ -6,10 +6,10 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date("2026-09-06T08:00:00.000Z") });
 });
 
-test("calibrates, completes a hotel mission, and resumes measured progress", async ({ page }) => {
+test("learns first, calibrates before challenge, and resumes measured progress", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "2 分钟起点小游戏" })).toBeVisible();
-  await completeCalibration(page);
+  await expect(page.getByRole("heading", { name: "2 分钟起点小游戏" })).toHaveCount(0);
+  await expect(page.locator(".home-view")).toBeVisible();
   await page.getByRole("button", { name: /30 分钟训练/ }).click();
   await expect(page.getByRole("heading", { name: "今天的 30 分钟训练" })).toBeVisible();
   await expect(page.locator(".daily-plan-list li")).toHaveCount(3);
@@ -32,6 +32,8 @@ test("calibrates, completes a hotel mission, and resumes measured progress", asy
   }
   await expect(page.getByRole("heading", { name: /句子地图/ })).toBeVisible();
   await page.getByRole("button", { name: "进入练习" }).click();
+  await expect(page.getByRole("heading", { name: "2 分钟起点小游戏" })).toBeVisible();
+  await completeCalibration(page);
   await page.getByRole("button", { name: "显示答案" }).click();
   await page.getByLabel("需要再练", { exact: true }).check();
   await page.getByRole("button", { name: "确认", exact: true }).click();
@@ -67,7 +69,6 @@ test("calibrates, completes a hotel mission, and resumes measured progress", asy
 
 test("completes a two-minute morning review and keeps it completed", async ({ page }) => {
   await page.goto("/");
-  await completeCalibration(page);
   await page.getByRole("button", { name: "开始复习" }).first().click();
   await expect(page.getByRole("heading", { name: "早晨 2 分钟复习" })).toBeVisible();
   await page.getByRole("button", { name: "说完了，显示答案" }).click();
